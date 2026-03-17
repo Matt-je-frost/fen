@@ -1,4 +1,4 @@
-// Fen Worker v33: large avatar sidebar (2026-03-17)
+// Fen Worker v33: large avatar sidebar (2026-03-17) [GitHub pipeline active]
 var CONFIG={
   anthropicModel:"claude-sonnet-4-20250514",
   supabaseUrl:"https://auigfknbpdzeizhrllgx.supabase.co",
