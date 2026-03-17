@@ -2,17 +2,18 @@ name = "fen-worker"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 account_id = "16338cf313785561a79f39fcfe018ee3"
+no_bundle = true
 
-# Fen's 4-hour wake cycle - defined here so deploys never strip it
+# Fen's 4-hour wake cycle
 [triggers]
 crons = ["0 */4 * * *"]
 
-# KV namespace for fast in-worker state
+# KV namespace
 [[kv_namespaces]]
 binding = "FEN_STATE"
 id = "981059d0cdbc451f936fd60525922f73"
 
-# Secrets are configured via `wrangler secret put` or the CF dashboard
+# Secrets via wrangler secret put or CF dashboard
 # ANTHROPIC_API_KEY
 # SUPABASE_KEY
 # MONDAY_API_KEY
