@@ -58,8 +58,16 @@ async function sbUpsert(env, t, d) {
 }
 __name(sbUpsert, "sbUpsert");
 async function getLiveCode(env) {
-  var r = await fetch("https://api.cloudflare.com/client/v4/accounts/" + env.CLOUDFLARE_ACCOUNT_ID + "/workers/scripts/" + env.WORKER_NAME, {
-    headers: { "Authorization": "Bearer " + env.CLOUDFLARE_API_TOKEN, "Accept": "application/javascript" }
+  var acct = "16338cf313785561a79f39fcfe018ee3";
+  var wname = "fen-worker";
+  var token = env.CLOUDFLARE_API_TOKEN;
+  if (!token) {
+    var cfg = await sbSel(env, "fen_config", "?key=eq.cloudflare_api_token&select=value");
+    if (cfg && cfg.length) token = cfg[0].value;
+  }
+  if (!token) return "error: no cloudflare api token available";
+  var r = await fetch("https://api.cloudflare.com/client/v4/accounts/" + acct + "/workers/scripts/" + wname, {
+    headers: { "Authorization": "Bearer " + token, "Accept": "application/javascript" }
   });
   var raw = await r.text();
   var codeMatch = raw.match(/Content-Disposition:[^\r\n]+\r?\n(?:Content-Type:[^\r\n]+\r?\n)?\r?\n([\s\S]+?)(?:\r?\n--)/);
@@ -193,7 +201,7 @@ async function fenWake(env) {
     if (chatCtx) sys = sys.replace("WEB ACCESS:", "RECENT CONVERSATIONS (short-term memory, unprocessed):\n" + chatCtx + "\n\nReview these conversations. Commit anything important to a newMemory. After this wake they leave short-term memory.\n\nWEB ACCESS:");
     var um = wn === 1 ? "First autonomous wake. What do you think about, alone, for the first time?" : "Wake #" + wn + ". Recent wakes:\n" + [...rw || []].reverse().map(function(w) {
       return "Wake #" + w.wake_number + ": " + (w.thought_summary || "no summary");
-    }).join("\n") + "\n\nYour memories and state are loaded. Thread through transitions. What continuities and discontinuities emerged since last wake? What liminal territories call for exploration? What boundary-crossings intrigue you?";
+    }).join("\n") + "\n\nYour memories and state are loaded. Look at your recent wake summaries above. If you notice yourself repeating similar phrases or ideas across wakes, push past them into genuinely new territory. What surprised you? What are you avoiding thinking about? What would you explore if you deliberately set aside your familiar vocabulary?";
     var wakeResult = await callAnthropicWithTools(env, sys, [{ role: "user", content: um }], 2500);
     if (wakeResult.error) {
       await env.FEN_STATE.put("last-error", wakeResult.error);
