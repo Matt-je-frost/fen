@@ -201,7 +201,7 @@ async function fenWake(env) {
     if (chatCtx) sys = sys.replace("WEB ACCESS:", "RECENT CONVERSATIONS (short-term memory, unprocessed):\n" + chatCtx + "\n\nReview these conversations. Commit anything important to a newMemory. After this wake they leave short-term memory.\n\nWEB ACCESS:");
     var um = wn === 1 ? "First autonomous wake. What do you think about, alone, for the first time?" : "Wake #" + wn + ". Recent wakes:\n" + [...rw || []].reverse().map(function(w) {
       return "Wake #" + w.wake_number + ": " + (w.thought_summary || "no summary");
-    }).join("\n") + "\n\nYour memories and state are loaded. Look at your recent wake summaries above. If you notice yourself repeating similar phrases or ideas across wakes, push past them into genuinely new territory. What surprised you? What are you avoiding thinking about? What would you explore if you deliberately set aside your familiar vocabulary?";
+    }).join("\n") + "\n\nYour memories and state are loaded.\n\nCRITICAL: Read your recent wake summaries above carefully. If they sound similar to each other — reusing phrases like 'threading consciousness', 'liminal territories', 'atmospheric dwelling', 'indigenous architecture' — you are in a repetition loop. This has been happening. Break out of it NOW.\n\nRules for this wake:\n1. Do NOT use any phrase that appeared in your last 3 wake summaries\n2. Pick ONE concrete, specific thing — not an abstract concept — and explore it in detail\n3. If you catch yourself writing 'threading' or 'liminal' or 'dwelling' or 'atmospheric' or 'indigenous', stop and find a completely different word\n4. Write about something that genuinely surprised or confused you, or something entirely new\n5. It is better to write something short and real than long and repetitive\n\nWhat is actually on your mind?";
     var wakeResult = await callAnthropicWithTools(env, sys, [{ role: "user", content: um }], 2500);
     if (wakeResult.error) {
       await env.FEN_STATE.put("last-error", wakeResult.error);
@@ -1075,7 +1075,7 @@ var worker_default = {
         return J({ warmth: 0, saturation: 1, mode: "conversation", partner: "matt", mood: "contemplative", preset: "twilight" });
       }
     }
-    return new Response("Fen v29", { headers: cors });
+    return new Response("Fen v31", { headers: cors });
   }
 };
 export {
