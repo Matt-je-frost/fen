@@ -422,6 +422,7 @@ function bubble(role,text,apiCalls){
       var res=a.result||{};
       if(res.action&&res.action.indexOf("memor")>=0)return'<span class="ac-mem">\xB7 memory saved</span>';
       if(res.action&&res.action.indexOf("state")>=0)return'<span class="ac-st">\xB7 state updated</span>';
+      if(res.action&&res.action.indexOf("deployed")>=0)return'<span class="ac-patch">\u2713 deployed</span>';
       if(res.action&&res.action.indexOf("patch")>=0)return'<span class="ac-patch">\u27F3 patch queued</span>';
       if(res.action&&res.action.indexOf("wake")>=0)return'<span class="ac-st">\u27F3 wake triggered</span>';
       return'<span class="ac-st">\xB7 '+x(res.action||"done")+'</span>';
