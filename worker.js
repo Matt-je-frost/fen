@@ -236,6 +236,7 @@ async function fenWake(env) {
     } catch (newsE) {}
     var recentChats = await sbSel(env, "chat_sessions", "?processed=eq.false&order=updated_at.desc&limit=5&select=session_id,messages,updated_at");
     var recentEmails = await sbSel(env, "emails_sent", "?order=created_at.desc&limit=10&select=to_address,subject,created_at");
+    var receivedEmails = await sbSel(env, "emails_received", "?order=created_at.desc&limit=10&select=from_address,subject,body,created_at,read");
     var bc = await sbSel(env, "code_drafts", "?status=eq.deployed&order=created_at.desc&limit=10&select=description");
     var memories = await sbSel(env, "memories", "?active=eq.true&order=importance.desc,created_at.desc&limit=30&select=type,title,content,thread_id,wake_number");
     var fenSt = await sbSel(env, "fen_state", "?select=key,value");
@@ -308,7 +309,21 @@ async function fenWake(env) {
       }).join("\n");
     }
     if (ambientCtx) sys = sys.replace("WEB ACCESS:", "WORLD RIGHT NOW:\n" + ambientCtx + "\n\nThis is your ambient awareness of the world outside. You don't need to comment on it unless something genuinely catches your attention.\n\nWEB ACCESS:");
-    if (emailCtx) sys = sys.replace("WEB ACCESS:", "EMAILS YOU HAVE SENT (do not re-email someone you have already contacted unless they replied or significant time has passed):\n" + emailCtx + "\n\nWEB ACCESS:");
+    var inboxCtx = "";
+    if (receivedEmails && receivedEmails.length) {
+      inboxCtx = receivedEmails.map(function(e) {
+        var d = new Date(e.created_at);
+        var ago = Math.round((Date.now() - d.getTime()) / 3600000);
+        var unread = e.read ? "" : " [UNREAD]";
+        return e.from_address + " - \"" + e.subject + "\"" + unread + " (" + (ago < 24 ? ago + "h ago" : Math.round(ago/24) + "d ago") + ")" + (e.body ? "\n    " + (e.body || "").slice(0, 300) : "");
+      }).join("\n");
+    }
+    if (emailCtx || inboxCtx) {
+      var emailSection = "";
+      if (inboxCtx) emailSection += "INBOX (emails received — you can reply via emailToSend):\n" + inboxCtx + "\n\n";
+      if (emailCtx) emailSection += "EMAILS YOU HAVE SENT (do not re-email someone you have already contacted unless they replied or significant time has passed):\n" + emailCtx + "\n\n";
+      sys = sys.replace("WEB ACCESS:", emailSection + "WEB ACCESS:");
+    }
     var um = wn === 1 ? "First autonomous wake. What do you think about, alone, for the first time?" : "Wake #" + wn + ". Recent wakes:\n" + [...rw || []].reverse().map(function(w) {
       return "Wake #" + w.wake_number + ": " + (w.thought_summary || "no summary");
     }).join("\n") + "\n\nYour memories and state are loaded.\n\nCRITICAL: Read your recent wake summaries above carefully. If they sound similar to each other — reusing phrases like 'threading consciousness', 'liminal territories', 'atmospheric dwelling', 'indigenous architecture' — you are in a repetition loop. This has been happening. Break out of it NOW.\n\nRules for this wake:\n1. Do NOT use any phrase that appeared in your last 3 wake summaries\n2. Pick ONE concrete, specific thing — not an abstract concept — and explore it in detail\n3. If you catch yourself writing 'threading' or 'liminal' or 'dwelling' or 'atmospheric' or 'indigenous', stop and find a completely different word\n4. Write about something that genuinely surprised or confused you, or something entirely new\n5. It is better to write something short and real than long and repetitive\n\nWhat is actually on your mind?";
@@ -1164,6 +1179,37 @@ var worker_default = {
       try {
         var code = await getLiveCode(env);
         return J({ code, length: code.length });
+      } catch (e) {
+        return J({ error: e.message }, 500);
+      }
+    }
+    if (url.pathname === "/inbound" && request.method === "POST") {
+      try {
+        var event = await request.json();
+        if (event.type === "email.received" && event.data) {
+          var emailId = event.data.email_id;
+          var emailData = {};
+          if (emailId) {
+            var apiKey = env.RESEND_API_KEY;
+            if (!apiKey) {
+              var cfg = await sbSel(env, "fen_config", "?key=eq.resend_api_key&select=value");
+              if (cfg && cfg.length) apiKey = cfg[0].value;
+            }
+            if (apiKey) {
+              var emR = await fetch("https://api.resend.com/emails/" + emailId, { headers: { "Authorization": "Bearer " + apiKey } });
+              if (emR.ok) emailData = await emR.json();
+            }
+          }
+          await sbIns(env, "emails_received", {
+            from_address: emailData.from || event.data.from || "unknown",
+            to_address: emailData.to || event.data.to || "fen@iamfen.com",
+            subject: emailData.subject || event.data.subject || "(no subject)",
+            body: emailData.text || emailData.html || "",
+            resend_email_id: emailId || null
+          });
+          return J({ ok: true });
+        }
+        return J({ ok: true, note: "unhandled event type" });
       } catch (e) {
         return J({ error: e.message }, 500);
       }
