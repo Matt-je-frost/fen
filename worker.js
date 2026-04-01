@@ -1105,6 +1105,7 @@ var worker_default = {
         var data = null;
         try {
           if (match[3]) {
+            var fullMatch3 = match[3];
             var raw3 = match[3].replace(/[\u2018\u2019\u2032]/g, "").replace(/[\u201c\u201d]/g, '"').replace(/[\r\n\t]+/g, " ").trim();
             var depth = 0, end = -1;
             for (var ci = 0; ci < raw3.length; ci++) {
@@ -1122,6 +1123,12 @@ var worker_default = {
               apiCallRegex.lastIndex = match.index + match[0].length - match[3].length + end + 1;
             }
             data = JSON.parse(raw3);
+          }
+          if (!data && fullMatch3 && fullMatch3.indexOf("<svg") >= 0 && fullMatch3.indexOf("</svg>") >= 0) {
+            var svS2 = fullMatch3.indexOf("<svg");
+            var svE2 = fullMatch3.indexOf("</svg>", svS2) + 6;
+            var tM3 = fullMatch3.match(/"title"\s*:\s*"([^"]*)"/);
+            data = { svg: fullMatch3.slice(svS2, svE2), title: tM3 ? tM3[1] : "Untitled" };
           }
         } catch (pe) {
           if (raw3 && raw3.indexOf("<svg") >= 0) {
