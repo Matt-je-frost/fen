@@ -1209,7 +1209,7 @@ var worker_default = {
               if (cfg && cfg.length) apiKey = cfg[0].value;
             }
             if (apiKey) {
-              var emR = await fetch("https://api.resend.com/emails/" + emailId, { headers: { "Authorization": "Bearer " + apiKey } });
+              var emR = await fetch("https://api.resend.com/emails/receiving/" + emailId, { headers: { "Authorization": "Bearer " + apiKey } });
               if (emR.ok) emailData = await emR.json();
             }
           }
