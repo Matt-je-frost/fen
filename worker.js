@@ -1131,17 +1131,12 @@ var worker_default = {
             data = { svg: fullMatch3.slice(svS2, svE2), title: tM3 ? tM3[1] : "Untitled" };
           }
         } catch (pe) {
-          if (raw3 && raw3.indexOf("<svg") >= 0) {
-            var svgStart = raw3.indexOf("<svg");
-            var svgEnd = raw3.lastIndexOf("</svg>");
-            if (svgEnd > svgStart) {
-              var svgContent = raw3.slice(svgStart, svgEnd + 6);
-              var titleMatch = raw3.match(/"title"\s*:\s*"([^"]*)"/);
-              data = { svg: svgContent, title: titleMatch ? titleMatch[1] : "Untitled" };
-            } else {
-              apiCalls.push({ call: match[0], error: "JSON parse failed: " + pe.message });
-              continue;
-            }
+          var svgSrc = fullMatch3 || raw3 || "";
+          var svIdx = svgSrc.indexOf("<svg");
+          var svEndIdx = svgSrc.lastIndexOf("</svg>");
+          if (svIdx >= 0 && svEndIdx > svIdx) {
+            var titleM = svgSrc.match(/"title"\s*:\s*"([^"]*)"/);
+            data = { svg: svgSrc.slice(svIdx, svEndIdx + 6), title: titleM ? titleM[1] : "Untitled" };
           } else {
             apiCalls.push({ call: match[0], error: "JSON parse failed: " + pe.message });
             continue;
