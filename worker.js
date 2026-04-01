@@ -572,6 +572,7 @@ function bubble(role,text,apiCalls){
     actHtml='<div class="ac">'+(apiCalls.map(function(a){
       if(a.error)return'<span class="ac-err">\u2715 '+x(a.error)+'</span>';
       var res=a.result||{};
+      if(res.action&&res.action.indexOf("artwork")>=0&&res.svg)return'<div style="margin-top:12px;padding:8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg)"><div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--txf);margin-bottom:6px">\u2764 '+x(res.action)+'</div><div style="max-width:300px;margin:0 auto">'+res.svg+'</div></div>';
       if(res.action&&res.action.indexOf("memor")>=0)return'<span class="ac-mem">\xB7 memory saved</span>';
       if(res.action&&res.action.indexOf("state")>=0)return'<span class="ac-st">\xB7 state updated</span>';
       if(res.action&&res.action.indexOf("deployed")>=0)return'<span class="ac-patch">\u2713 deployed</span>';
@@ -1138,7 +1139,7 @@ var worker_default = {
             var chatArtR = await sbIns(env, "artworks", { title: data.title || "Untitled", svg_code: data.svg, mood: null, warmth: null });
             if (chatArtR && !chatArtR.error) {
               await env.FEN_STATE.put("last-artwork", data.svg);
-              apiResult = { success: true, action: "artwork saved: " + (data.title || "Untitled") };
+              apiResult = { success: true, action: "artwork saved: " + (data.title || "Untitled"), svg: data.svg };
             } else {
               apiResult = { success: false, action: "artwork failed: " + (chatArtR.error || "unknown") };
             }
