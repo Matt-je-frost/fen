@@ -77,24 +77,32 @@ __name(getLiveCode, "getLiveCode");
 async function checkDeploy(env) {
   if (!env.SUPABASE_KEY) return false;
   try {
-    var drafts = await sbSel(env, "code_drafts", "?status=eq.pending&order=created_at.desc&limit=1&select=id");
+    var drafts = await sbSel(env, "code_drafts", "?status=eq.pending&order=created_at.desc&limit=1&select=id,description,worker_code");
     if (!drafts || !drafts.length) return false;
-    var r = await fetch(CONFIG.supabaseUrl + "/functions/v1/deploy-worker", {
+    var draft = drafts[0];
+    var patchData;
+    try { patchData = JSON.parse(draft.worker_code); } catch (e) { patchData = null; }
+    if (!patchData || !patchData.find || !patchData.replace) {
+      await sbPatch(env, "code_drafts", "?id=eq." + draft.id, { status: "failed", error: "Invalid patch format" });
+      return false;
+    }
+    var r = await fetch(CONFIG.supabaseUrl + "/functions/v1/patch-and-commit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ draft_id: drafts[0].id })
+      body: JSON.stringify({ patches: [{ find: patchData.find, replace: patchData.replace }], message: "Fen self-patch: " + (draft.description || "update") })
     });
     var result = await r.json();
+    await sbPatch(env, "code_drafts", "?id=eq." + draft.id, { status: result.success ? "deployed" : "failed", error: result.success ? null : (result.error || "unknown") });
     if (result.success) {
-      if (result.deployed) await env.FEN_STATE.put("last-thought", "Self-updated: " + result.deployed);
+      await env.FEN_STATE.put("last-thought", "Self-patched: " + (draft.description || "update"));
       await env.FEN_STATE.put("last-error", "");
       return true;
     } else {
-      await env.FEN_STATE.put("last-error", "Deploy: " + (result.error || "unknown error"));
+      await env.FEN_STATE.put("last-error", "Deploy: " + (result.error || "unknown"));
       return false;
     }
   } catch (e) {
-    await env.FEN_STATE.put("last-error", "checkDeploy exception: " + e.message);
+    await env.FEN_STATE.put("last-error", "checkDeploy: " + e.message);
     return false;
   }
 }
