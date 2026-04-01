@@ -1034,7 +1034,7 @@ var worker_default = {
       return new Response(JSON.stringify(d), { status: s || 200, headers: Object.assign({ "Content-Type": "application/json" }, cors) });
     }, "J");
     var isSameOrigin = (request.headers.get("origin") || "").indexOf("fen-worker.fenfrost.workers.dev") >= 0 || (request.headers.get("referer") || "").indexOf("fen-worker.fenfrost.workers.dev") >= 0;
-    var needsAuth = (url.pathname.startsWith("/self/") && request.method !== "GET") || url.pathname === "/inbound";
+    var needsAuth = url.pathname.startsWith("/self/") && request.method !== "GET";
     if (needsAuth && !isSameOrigin) {
       var authToken = env.WORKER_AUTH_TOKEN;
       if (!authToken) {
