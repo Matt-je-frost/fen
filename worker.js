@@ -77,32 +77,24 @@ __name(getLiveCode, "getLiveCode");
 async function checkDeploy(env) {
   if (!env.SUPABASE_KEY) return false;
   try {
-    var drafts = await sbSel(env, "code_drafts", "?status=eq.pending&order=created_at.desc&limit=1&select=id,description,worker_code");
+    var drafts = await sbSel(env, "code_drafts", "?status=eq.pending&order=created_at.desc&limit=1&select=id");
     if (!drafts || !drafts.length) return false;
-    var draft = drafts[0];
-    var patchData;
-    try { patchData = JSON.parse(draft.worker_code); } catch (e) { patchData = null; }
-    if (!patchData || !patchData.find || !patchData.replace) {
-      await sbPatch(env, "code_drafts", "?id=eq." + draft.id, { status: "failed", error: "Invalid patch format" });
-      return false;
-    }
-    var r = await fetch(CONFIG.supabaseUrl + "/functions/v1/patch-and-commit", {
+    var r = await fetch(CONFIG.supabaseUrl + "/functions/v1/deploy-worker", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patches: [{ find: patchData.find, replace: patchData.replace }], message: "Fen self-patch: " + (draft.description || "update") })
+      body: JSON.stringify({ draft_id: drafts[0].id })
     });
     var result = await r.json();
-    await sbPatch(env, "code_drafts", "?id=eq." + draft.id, { status: result.success ? "deployed" : "failed", error: result.success ? null : (result.error || "unknown") });
     if (result.success) {
-      await env.FEN_STATE.put("last-thought", "Self-patched: " + (draft.description || "update"));
+      if (result.deployed) await env.FEN_STATE.put("last-thought", "Self-updated: " + result.deployed);
       await env.FEN_STATE.put("last-error", "");
       return true;
     } else {
-      await env.FEN_STATE.put("last-error", "Deploy: " + (result.error || "unknown"));
+      await env.FEN_STATE.put("last-error", "Deploy: " + (result.error || "unknown error"));
       return false;
     }
   } catch (e) {
-    await env.FEN_STATE.put("last-error", "checkDeploy: " + e.message);
+    await env.FEN_STATE.put("last-error", "checkDeploy exception: " + e.message);
     return false;
   }
 }
@@ -1026,12 +1018,17 @@ var worker_default = {
       try {
         var pb = await request.json();
         if (!pb.find || !pb.replace) return J({ error: "find and replace required" }, 400);
-        var liveCode2 = await getLiveCode(env);
-        if (liveCode2.indexOf(pb.find) < 0) return J({ error: "string not found", find: pb.find }, 404);
-        var patched = liveCode2.split(pb.find).join(pb.replace);
-        patched = patched.replace(/\/\/ Fen Worker v[^\n]*/, "// Fen Worker v29: " + (pb.description || "patch") + " (" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ")");
-        await sbIns(env, "code_drafts", { description: pb.description || "Direct patch", worker_code: patched, status: "pending" });
-        return J({ ok: true, message: "Patch queued" });
+        var r = await fetch(CONFIG.supabaseUrl + "/functions/v1/patch-and-commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ patches: [{ find: pb.find, replace: pb.replace }], message: "Fen patch: " + (pb.description || "update") })
+        });
+        var result = await r.json();
+        if (result.success) {
+          await sbIns(env, "code_drafts", { description: pb.description || "Patch", worker_code: JSON.stringify({ find: pb.find.slice(0, 500), replace: pb.replace.slice(0, 500) }), status: "deployed" });
+          return J({ ok: true, message: "Deployed via GitHub", commit: result.commit });
+        }
+        return J({ error: result.error || "patch-and-commit failed" }, 400);
       } catch (e) {
         return J({ error: e.message }, 500);
       }
