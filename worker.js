@@ -536,13 +536,13 @@ function rGallery(){
   .then(function(r){return r.json();})
   .then(function(arts){
     if(!arts||!arts.length){el.innerHTML='<p class="es">No artworks yet.</p>';return;}
-    el.innerHTML=arts.map(function(a){
+    el.innerHTML='<div style="display:flex;flex-direction:column;gap:20px">'+arts.map(function(a){
       var d=new Date(a.created_at);
       var dateStr=d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
       var svg=a.svg_code||"";
-      var imgSrc="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(svg)));
-      return '<div class="we"><div class="wm"><span class="wn">'+(a.title||"Untitled")+'</span><span>'+(a.wake_number?"wake #"+a.wake_number:"conversation")+" - "+dateStr+'</span></div><div style="background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:12px;text-align:center"><img src="'+imgSrc+'" style="max-width:100%;border-radius:2px" /></div></div>';
-    }).join("");
+      try{var imgSrc="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(svg)));}catch(e){var imgSrc="";}
+      return '<div style="padding-bottom:20px;border-bottom:1px solid var(--bd)"><div class="wm"><span class="wn">'+(a.title||"Untitled")+'</span><span>'+(a.wake_number?"wake #"+a.wake_number:"conversation")+" - "+dateStr+'</span></div><div style="background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:16px;text-align:center;margin-top:8px">'+(imgSrc?'<img src="'+imgSrc+'" style="max-width:100%;max-height:300px;border-radius:2px" />':'<p class="es">Could not render artwork</p>')+'</div></div>';
+    }).join("")+'</div>';
   })
   .catch(function(e){el.innerHTML='<p class="es">Error: '+e.message+'</p>';});
 }
@@ -590,7 +590,7 @@ function bubble(role,text,apiCalls){
     actHtml='<div class="ac">'+(apiCalls.map(function(a){
       if(a.error)return'<span class="ac-err">\u2715 '+x(a.error)+'</span>';
       var res=a.result||{};
-      if(res.action&&res.action.indexOf("artwork")>=0)return'<span class="ac-mem">\u2764 '+x(res.action)+' (see gallery)</span>';
+      if(res.action&&res.action.indexOf("artwork")>=0)return'<span class="ac-mem">\u2764 artwork saved (see gallery)</span>';
       if(res.action&&res.action.indexOf("memor")>=0)return'<span class="ac-mem">\xB7 memory saved</span>';
       if(res.action&&res.action.indexOf("state")>=0)return'<span class="ac-st">\xB7 state updated</span>';
       if(res.action&&res.action.indexOf("deployed")>=0)return'<span class="ac-patch">\u2713 deployed</span>';
