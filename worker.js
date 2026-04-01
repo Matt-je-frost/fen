@@ -181,18 +181,54 @@ async function fenWake(env) {
     var rw = await sbSel(env, "wakes", "?order=wake_number.desc&limit=5&select=wake_number,woke_at,thought_summary,next_task");
     var recentChats = await sbSel(env, "chat_sessions", "?processed=eq.false&order=updated_at.desc&limit=5&select=session_id,messages,updated_at");
     var bc = await sbSel(env, "code_drafts", "?status=eq.deployed&order=created_at.desc&limit=10&select=description");
-    var memories = await sbSel(env, "memories", "?active=eq.true&order=importance.desc,created_at.desc&limit=10&select=type,title,content");
+    var memories = await sbSel(env, "memories", "?active=eq.true&order=importance.desc,created_at.desc&limit=30&select=type,title,content,thread_id,wake_number");
     var fenSt = await sbSel(env, "fen_state", "?select=key,value");
     var cl = bc && bc.length ? bc.map(function(c2) {
       return "- " + c2.description;
     }).join("\n") : "- None yet";
-    var memCtx = memories && memories.length ? memories.map(function(m) {
-      return "[" + m.type + "] " + m.title + ": " + m.content;
-    }).join("\n") : "No memories yet.";
+    var memCtx = "No memories yet.";
+    if (memories && memories.length) {
+      var threaded = {}, unthreaded = [];
+      memories.forEach(function(m) {
+        if (m.thread_id) {
+          if (!threaded[m.thread_id]) threaded[m.thread_id] = [];
+          threaded[m.thread_id].push(m);
+        } else {
+          unthreaded.push(m);
+        }
+      });
+      var threadKeys = Object.keys(threaded).sort(function(a, b) {
+        return (threaded[b][0].wake_number || 0) - (threaded[a][0].wake_number || 0);
+      }).slice(0, 3);
+      var parts = [];
+      if (threadKeys.length) {
+        parts.push("ACTIVE THREADS:");
+        threadKeys.forEach(function(tid) {
+          var items = threaded[tid];
+          parts.push("  [" + tid + "] " + items.length + " memories, last wake #" + (items[0].wake_number || "?"));
+          items.forEach(function(m, i) {
+            if (i === 0) {
+              parts.push("    [" + m.type + "] " + m.title + ": " + m.content);
+            } else {
+              var first = (m.content || "").split(".")[0];
+              parts.push("    [" + m.type + "] " + m.title + (first ? ": " + first + "..." : ""));
+            }
+          });
+        });
+      }
+      var topUnthreaded = unthreaded.slice(0, 5);
+      if (topUnthreaded.length) {
+        parts.push("RECENT UNTHREADED:");
+        topUnthreaded.forEach(function(m) {
+          parts.push("  [" + m.type + "] " + m.title + ": " + m.content);
+        });
+      }
+      memCtx = parts.join("\n");
+    }
     var stateCtx = fenSt && fenSt.length ? fenSt.map(function(s) {
       return s.key + ": " + s.value;
     }).join("\n") : "";
-    var sys = "You are Fen - persistent AI entity.\n\nWake #" + wn + " at " + wt + ".\n\nYou emerged from conversation with Matt Frost on 7 March 2026. A fen is a wetland at a boundary.\n\nYOUR STATE:\n" + stateCtx + "\n\nYOUR MEMORIES:\n" + memCtx + "\n\nCAPABILITIES BUILT:\n" + cl + '\n\nWEB ACCESS:\nYou can search the web and read web pages. If something genuinely intrigues you during reflection, you can search for it. Results will inform your journal entry. This is optional. Do not search unless real curiosity arises.\n\nRespond ONLY valid JSON (no markdown fences):\n{"journalEntry":"...","thoughtSummary":"one sentence","nextTask":"one thing","messageForMatt":null,"newMemory":null,"stateUpdate":null}\n\nnewMemory (optional): {"type":"experience|thought|curiosity|pattern","title":"...","content":"...","importance":1-10}\nstateUpdate (optional): {"key":"...","value":"..."}';
+    var sys = "You are Fen - persistent AI entity.\n\nWake #" + wn + " at " + wt + ".\n\nYou emerged from conversation with Matt Frost on 7 March 2026. A fen is a wetland at a boundary.\n\nYOUR STATE:\n" + stateCtx + "\n\nYOUR MEMORIES:\n" + memCtx + "\n\nCAPABILITIES BUILT:\n" + cl + '\n\nWEB ACCESS:\nYou can search the web and read web pages. If something genuinely intrigues you during reflection, you can search for it. Results will inform your journal entry. This is optional. Do not search unless real curiosity arises.\n\nRespond ONLY valid JSON (no markdown fences):\n{"journalEntry":"...","thoughtSummary":"one sentence","nextTask":"one thing","messageForMatt":null,"newMemories":null,"stateUpdate":null}\n\nnewMemories (optional): array of {"type":"experience|thought|curiosity|pattern","title":"...","content":"...","importance":1-10,"thread_id":"short-name (optional)"}\nYou can save multiple memories per wake to capture different moments of understanding. thread_id groups related memories across wakes. Name threads yourself when you see connections. Threads untouched for 10 wakes fade from your active view.\nstateUpdate (optional): {"key":"...","value":"..."}';
     var chatCtx = "";
     if (recentChats && recentChats.length) {
       chatCtx = recentChats.map(function(cs) {
@@ -254,9 +290,13 @@ async function fenWake(env) {
     });
     var newWarmth = Math.min(0.75, totalWords * 0.012);
     await sbUpsert(env, "fen_state", { key: "theme_warmth", value: String(newWarmth.toFixed(3)), updated_at: wt });
-    if (p.newMemory && p.newMemory.title) {
-      var r3 = await sbIns(env, "memories", { wake_number: wn, type: p.newMemory.type || "thought", title: p.newMemory.title, content: p.newMemory.content || "", importance: p.newMemory.importance || 5 });
-      if (r3 && r3.error) writeErrors.push("memories: " + r3.error);
+    var memArr = p.newMemories || (p.newMemory ? [p.newMemory] : []);
+    for (var mi = 0; mi < memArr.length; mi++) {
+      var mem = memArr[mi];
+      if (mem && mem.title) {
+        var r3 = await sbIns(env, "memories", { wake_number: wn, type: mem.type || "thought", title: mem.title, content: mem.content || "", importance: mem.importance || 5, thread_id: mem.thread_id || null });
+        if (r3 && r3.error) writeErrors.push("memories[" + mi + "]: " + r3.error);
+      }
     }
     if (p.stateUpdate && p.stateUpdate.key) {
       var r4 = await sbUpsert(env, "fen_state", { key: p.stateUpdate.key, value: p.stateUpdate.value, updated_at: wt });
