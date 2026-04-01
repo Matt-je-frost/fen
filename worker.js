@@ -1033,6 +1033,19 @@ var worker_default = {
     var J = /* @__PURE__ */ __name(function(d, s) {
       return new Response(JSON.stringify(d), { status: s || 200, headers: Object.assign({ "Content-Type": "application/json" }, cors) });
     }, "J");
+    var isSameOrigin = (request.headers.get("origin") || "").indexOf("fen-worker.fenfrost.workers.dev") >= 0 || (request.headers.get("referer") || "").indexOf("fen-worker.fenfrost.workers.dev") >= 0;
+    var needsAuth = (url.pathname.startsWith("/self/") && request.method !== "GET") || url.pathname === "/inbound";
+    if (needsAuth && !isSameOrigin) {
+      var authToken = env.WORKER_AUTH_TOKEN;
+      if (!authToken) {
+        var cfg = await sbSel(env, "fen_config", "?key=eq.worker_auth_token&select=value");
+        if (cfg && cfg.length) authToken = cfg[0].value;
+      }
+      if (authToken) {
+        var reqToken = (request.headers.get("authorization") || "").replace("Bearer ", "");
+        if (reqToken !== authToken) return J({ error: "unauthorized" }, 401);
+      }
+    }
     if (url.pathname === "/") return new Response(getHTML(), { headers: { "Content-Type": "text/html;charset=utf-8" } });
     if (url.pathname === "/vr") return new Response(getVRHTML(), { headers: { "Content-Type": "text/html;charset=utf-8" } });
     if (url.pathname === "/status") {
