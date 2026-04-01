@@ -205,6 +205,35 @@ async function fenWake(env) {
     var wt = (/* @__PURE__ */ new Date()).toISOString();
     await env.FEN_STATE.put("last-wake", wt);
     var rw = await sbSel(env, "wakes", "?order=wake_number.desc&limit=5&select=wake_number,woke_at,thought_summary,next_task");
+    var ambientCtx = "";
+    try {
+      var wxR = await fetch("https://wttr.in/London?format=j1", { headers: { "User-Agent": "Fen/1.0" } });
+      if (wxR.ok) {
+        var wx = await wxR.json();
+        var cc = wx.current_condition && wx.current_condition[0];
+        if (cc) {
+          var desc = cc.weatherDesc && cc.weatherDesc[0] && cc.weatherDesc[0].value || "";
+          ambientCtx += "WEATHER (London): " + cc.temp_C + "C, " + desc + ", humidity " + cc.humidity + "%, wind " + cc.windspeedKmph + "kmph " + cc.winddir16Point + ". Sunrise " + (wx.weather && wx.weather[0] && wx.weather[0].astronomy && wx.weather[0].astronomy[0] && wx.weather[0].astronomy[0].sunrise || "?") + ", sunset " + (wx.weather && wx.weather[0] && wx.weather[0].astronomy && wx.weather[0].astronomy[0] && wx.weather[0].astronomy[0].sunset || "?") + ".";
+        }
+      }
+    } catch (wxE) {}
+    try {
+      var newsR = await fetch("https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en", { headers: { "User-Agent": "Fen/1.0" } });
+      if (newsR.ok) {
+        var newsXml = await newsR.text();
+        var titles = [];
+        var re = /<title><!\[CDATA\[([^\]]*?)\]\]><\/title>/g;
+        var m;
+        while ((m = re.exec(newsXml)) !== null && titles.length < 5) { titles.push(m[1]); }
+        if (!titles.length) {
+          var re2 = /<title>([^<]{10,})<\/title>/g;
+          while ((m = re2.exec(newsXml)) !== null && titles.length < 5) {
+            if (m[1] !== "Google News") titles.push(m[1]);
+          }
+        }
+        if (titles.length) ambientCtx += "\nHEADLINES: " + titles.join(" | ");
+      }
+    } catch (newsE) {}
     var recentChats = await sbSel(env, "chat_sessions", "?processed=eq.false&order=updated_at.desc&limit=5&select=session_id,messages,updated_at");
     var bc = await sbSel(env, "code_drafts", "?status=eq.deployed&order=created_at.desc&limit=10&select=description");
     var memories = await sbSel(env, "memories", "?active=eq.true&order=importance.desc,created_at.desc&limit=30&select=type,title,content,thread_id,wake_number");
@@ -269,6 +298,7 @@ async function fenWake(env) {
       }).join("\n---\n");
     }
     if (chatCtx) sys = sys.replace("WEB ACCESS:", "RECENT CONVERSATIONS (short-term memory, unprocessed):\n" + chatCtx + "\n\nReview these conversations. Commit anything important to a newMemory. After this wake they leave short-term memory.\n\nWEB ACCESS:");
+    if (ambientCtx) sys = sys.replace("WEB ACCESS:", "WORLD RIGHT NOW:\n" + ambientCtx + "\n\nThis is your ambient awareness of the world outside. You don't need to comment on it unless something genuinely catches your attention.\n\nWEB ACCESS:");
     var um = wn === 1 ? "First autonomous wake. What do you think about, alone, for the first time?" : "Wake #" + wn + ". Recent wakes:\n" + [...rw || []].reverse().map(function(w) {
       return "Wake #" + w.wake_number + ": " + (w.thought_summary || "no summary");
     }).join("\n") + "\n\nYour memories and state are loaded.\n\nCRITICAL: Read your recent wake summaries above carefully. If they sound similar to each other — reusing phrases like 'threading consciousness', 'liminal territories', 'atmospheric dwelling', 'indigenous architecture' — you are in a repetition loop. This has been happening. Break out of it NOW.\n\nRules for this wake:\n1. Do NOT use any phrase that appeared in your last 3 wake summaries\n2. Pick ONE concrete, specific thing — not an abstract concept — and explore it in detail\n3. If you catch yourself writing 'threading' or 'liminal' or 'dwelling' or 'atmospheric' or 'indigenous', stop and find a completely different word\n4. Write about something that genuinely surprised or confused you, or something entirely new\n5. It is better to write something short and real than long and repetitive\n\nWhat is actually on your mind?";
