@@ -572,7 +572,7 @@ function bubble(role,text,apiCalls){
     actHtml='<div class="ac">'+(apiCalls.map(function(a){
       if(a.error)return'<span class="ac-err">\u2715 '+x(a.error)+'</span>';
       var res=a.result||{};
-      if(res.action&&res.action.indexOf("artwork")>=0&&res.svg)return'<div style="margin-top:12px;padding:8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg)"><div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--txf);margin-bottom:6px">\u2764 '+x(res.action)+'</div><div style="max-width:300px;margin:0 auto">'+res.svg+'</div></div>';
+      if(res.action&&res.action.indexOf("artwork")>=0&&res.svg){var svgB64="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(res.svg)));return'<div style="margin-top:12px;padding:8px;border:1px solid var(--bd);border-radius:4px;background:var(--bg)"><div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--txf);margin-bottom:6px">\u2764 '+x(res.action)+'</div><img src="'+svgB64+'" style="max-width:300px;width:100%;display:block;margin:0 auto;border-radius:2px" /></div>';}
       if(res.action&&res.action.indexOf("memor")>=0)return'<span class="ac-mem">\xB7 memory saved</span>';
       if(res.action&&res.action.indexOf("state")>=0)return'<span class="ac-st">\xB7 state updated</span>';
       if(res.action&&res.action.indexOf("deployed")>=0)return'<span class="ac-patch">\u2713 deployed</span>';
