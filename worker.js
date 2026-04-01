@@ -1124,8 +1124,21 @@ var worker_default = {
             data = JSON.parse(raw3);
           }
         } catch (pe) {
-          apiCalls.push({ call: match[0], error: "JSON parse failed: " + pe.message });
-          continue;
+          if (raw3 && raw3.indexOf("<svg") >= 0) {
+            var svgStart = raw3.indexOf("<svg");
+            var svgEnd = raw3.lastIndexOf("</svg>");
+            if (svgEnd > svgStart) {
+              var svgContent = raw3.slice(svgStart, svgEnd + 6);
+              var titleMatch = raw3.match(/"title"\s*:\s*"([^"]*)"/);
+              data = { svg: svgContent, title: titleMatch ? titleMatch[1] : "Untitled" };
+            } else {
+              apiCalls.push({ call: match[0], error: "JSON parse failed: " + pe.message });
+              continue;
+            }
+          } else {
+            apiCalls.push({ call: match[0], error: "JSON parse failed: " + pe.message });
+            continue;
+          }
         }
         try {
           var apiResult;
