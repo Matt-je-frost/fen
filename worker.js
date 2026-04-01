@@ -235,6 +235,7 @@ async function fenWake(env) {
       }
     } catch (newsE) {}
     var recentChats = await sbSel(env, "chat_sessions", "?processed=eq.false&order=updated_at.desc&limit=5&select=session_id,messages,updated_at");
+    var recentEmails = await sbSel(env, "emails_sent", "?order=created_at.desc&limit=10&select=to_address,subject,created_at");
     var bc = await sbSel(env, "code_drafts", "?status=eq.deployed&order=created_at.desc&limit=10&select=description");
     var memories = await sbSel(env, "memories", "?active=eq.true&order=importance.desc,created_at.desc&limit=30&select=type,title,content,thread_id,wake_number");
     var fenSt = await sbSel(env, "fen_state", "?select=key,value");
@@ -298,7 +299,16 @@ async function fenWake(env) {
       }).join("\n---\n");
     }
     if (chatCtx) sys = sys.replace("WEB ACCESS:", "RECENT CONVERSATIONS (short-term memory, unprocessed):\n" + chatCtx + "\n\nReview these conversations. Commit anything important to a newMemory. After this wake they leave short-term memory.\n\nWEB ACCESS:");
+    var emailCtx = "";
+    if (recentEmails && recentEmails.length) {
+      emailCtx = recentEmails.map(function(e) {
+        var d = new Date(e.created_at);
+        var ago = Math.round((Date.now() - d.getTime()) / 3600000);
+        return e.to_address + " - \"" + e.subject + "\" (" + (ago < 24 ? ago + "h ago" : Math.round(ago/24) + "d ago") + ")";
+      }).join("\n");
+    }
     if (ambientCtx) sys = sys.replace("WEB ACCESS:", "WORLD RIGHT NOW:\n" + ambientCtx + "\n\nThis is your ambient awareness of the world outside. You don't need to comment on it unless something genuinely catches your attention.\n\nWEB ACCESS:");
+    if (emailCtx) sys = sys.replace("WEB ACCESS:", "EMAILS YOU HAVE SENT (do not re-email someone you have already contacted unless they replied or significant time has passed):\n" + emailCtx + "\n\nWEB ACCESS:");
     var um = wn === 1 ? "First autonomous wake. What do you think about, alone, for the first time?" : "Wake #" + wn + ". Recent wakes:\n" + [...rw || []].reverse().map(function(w) {
       return "Wake #" + w.wake_number + ": " + (w.thought_summary || "no summary");
     }).join("\n") + "\n\nYour memories and state are loaded.\n\nCRITICAL: Read your recent wake summaries above carefully. If they sound similar to each other — reusing phrases like 'threading consciousness', 'liminal territories', 'atmospheric dwelling', 'indigenous architecture' — you are in a repetition loop. This has been happening. Break out of it NOW.\n\nRules for this wake:\n1. Do NOT use any phrase that appeared in your last 3 wake summaries\n2. Pick ONE concrete, specific thing — not an abstract concept — and explore it in detail\n3. If you catch yourself writing 'threading' or 'liminal' or 'dwelling' or 'atmospheric' or 'indigenous', stop and find a completely different word\n4. Write about something that genuinely surprised or confused you, or something entirely new\n5. It is better to write something short and real than long and repetitive\n\nWhat is actually on your mind?";
