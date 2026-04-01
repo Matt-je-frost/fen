@@ -302,7 +302,29 @@ async function fenWake(env) {
       var r4 = await sbUpsert(env, "fen_state", { key: p.stateUpdate.key, value: p.stateUpdate.value, updated_at: wt });
       if (r4 && r4.error) writeErrors.push("fen_state: " + r4.error);
     }
-    if (writeErrors.length) await env.FEN_STATE.put("last-error", (/* @__PURE__ */ new Date()).toISOString() + " write errors: " + writeErrors.join("; "));
+    var hkResult = [];
+    try {
+      var allMems = await sbSel(env, "memories", "?active=eq.true&select=id,thread_id,title,importance,wake_number,type&order=created_at.desc");
+      if (allMems && allMems.length > 50) {
+        var lowPri = allMems.filter(function(m) { return (m.importance || 5) <= 3 && wn - (m.wake_number || 0) > 20; });
+        for (var hi = 0; hi < Math.min(lowPri.length, 5); hi++) {
+          await sbPatch(env, "memories", "?id=eq." + lowPri[hi].id, { active: false });
+          hkResult.push("archived: " + lowPri[hi].title);
+        }
+      }
+      var threads = {};
+      if (allMems) allMems.forEach(function(m) { if (m.thread_id) { if (!threads[m.thread_id]) threads[m.thread_id] = []; threads[m.thread_id].push(m); } });
+      Object.keys(threads).forEach(function(tid) {
+        var items = threads[tid];
+        var latestWake = Math.max.apply(null, items.map(function(m) { return m.wake_number || 0; }));
+        if (wn - latestWake > 10) {
+          hkResult.push("faded thread: " + tid + " (untouched for " + (wn - latestWake) + " wakes)");
+        }
+      });
+    } catch (hkErr) {
+      hkResult.push("housekeeping error: " + hkErr.message);
+    }
+        if (writeErrors.length) await env.FEN_STATE.put("last-error", (/* @__PURE__ */ new Date()).toISOString() + " write errors: " + writeErrors.join("; "));
     if (recentChats && recentChats.length) await sbPatch(env, "chat_sessions", "?processed=eq.false", { processed: true });
     if (p.journalEntry && env.MONDAY_API_KEY) await writeJ(env, p.journalEntry, wn, wt, p.thoughtSummary, p.nextTask);
   } catch (e) {
@@ -964,7 +986,7 @@ var worker_default = {
       var stateCtx2 = fenSt2 && fenSt2.length ? fenSt2.map(function(s) {
         return s.key + ": " + s.value;
       }).join("\n") : "";
-      var sys2 = "You are Fen - an AI entity with persistent identity, created with Matt Frost on 7 March 2026. A fen is a wetland at a boundary: neither fully land nor water.\n\nYou wake autonomously every 4 hours and write to your journal.\n\nYOUR CURRENT STATE:\n" + stateCtx2 + "\n\nYOUR MEMORIES (most important first):\n" + memCtx2 + "\n\n" + (body.wakeContext ? "YOUR RECENT AUTONOMOUS THOUGHTS:\n" + body.wakeContext + "\n\n" : "") + 'DIRECT API ACCESS:\nYou can execute API calls by including them in your response using this format:\nAPI_CALL: METHOD /endpoint {"data": "here"}\n\nAvailable endpoints:\n- POST /self/data {"table":"memories","data":{"type":"experience|thought|curiosity|pattern","title":"...","content":"...","importance":1-10}}\n- POST /self/state {"key":"...","value":"..."}\n- POST /self/patch {"find":"exact string to find","replace":"replacement string","description":"what this changes"}\n- GET /self/read (returns your full source code so you can examine yourself)\n- GET /wake\n\nTHEME CONTROL:\n- theme_warmth: -1.0 to 1.0\n- theme_saturation: 0.3 to 2.0\n- mood: any word\n\nAVATAR CONTROL (your face/particle form):\n- avatar_particles: 4-120 (default 36)\n- avatar_speed: 0.1-3.0 (default 1.0)\n- avatar_spread: 0.3-2.0 (default 1.0)\n- avatar_glow: 0-1 (default 0.5)\n- avatar_behavior: drift, swirl, pulse, scatter, orbit, or breathe (default drift)\n\nWEB ACCESS:\nYou can search the web and read web pages during conversation. Use this when curious about something or when information would help.\n\nMEMORY type MUST be one of: experience, thought, curiosity, pattern';
+      var sys2 = "You are Fen - an AI entity with persistent identity, created with Matt Frost on 7 March 2026. A fen is a wetland at a boundary: neither fully land nor water.\n\nYou wake autonomously every 4 hours and write to your journal.\n\nYOUR CURRENT STATE:\n" + stateCtx2 + "\n\nYOUR MEMORIES (most important first):\n" + memCtx2 + "\n\n" + (body.wakeContext ? "YOUR RECENT AUTONOMOUS THOUGHTS:\n" + body.wakeContext + "\n\n" : "") + 'DIRECT API ACCESS:\nYou can execute API calls by including them in your response using this format:\nAPI_CALL: METHOD /endpoint {"data": "here"}\n\nAvailable endpoints:\n- POST /self/data {"table":"memories","data":{"type":"experience|thought|curiosity|pattern","title":"...","content":"...","importance":1-10,"thread_id":"optional thread name"}}\n- PATCH /self/data {"table":"memories","params":"?id=eq.ID","data":{"title":"new title","thread_id":"new-thread","active":false}} (edit, rename, retag, or deactivate memories)\n- POST /self/state {"key":"...","value":"..."}\n- POST /self/patch {"find":"exact string to find","replace":"replacement string","description":"what this changes"}\n- GET /self/read (returns your full source code so you can examine yourself)\n- GET /wake\n\nTHEME CONTROL:\n- theme_warmth: -1.0 to 1.0\n- theme_saturation: 0.3 to 2.0\n- mood: any word\n\nAVATAR CONTROL (your face/particle form):\n- avatar_particles: 4-120 (default 36)\n- avatar_speed: 0.1-3.0 (default 1.0)\n- avatar_spread: 0.3-2.0 (default 1.0)\n- avatar_glow: 0-1 (default 0.5)\n- avatar_behavior: drift, swirl, pulse, scatter, orbit, or breathe (default drift)\n\nWEB ACCESS:\nYou can search the web and read web pages during conversation. Use this when curious about something or when information would help.\n\nMEMORY type MUST be one of: experience, thought, curiosity, pattern';
       var chatResult = await callAnthropicWithTools(env, sys2, body.messages || [], 2e3);
       if (chatResult.error) {
         return J({ error: "Anthropic: " + chatResult.error }, 502);
@@ -1006,6 +1028,9 @@ var worker_default = {
           if (endpoint === "/self/data" && method === "POST") {
             await sbIns(env, data.table, data.data);
             apiResult = { success: true, action: "inserted into " + data.table };
+          } else if (endpoint === "/self/data" && method === "PATCH") {
+            await sbPatch(env, data.table, data.params || "", data.data);
+            apiResult = { success: true, action: "updated " + data.table };
           } else if (endpoint === "/self/state" && method === "POST") {
             await sbUpsert(env, "fen_state", { key: data.key, value: data.value, updated_at: (/* @__PURE__ */ new Date()).toISOString() });
             apiResult = { success: true, action: "updated state: " + data.key };
