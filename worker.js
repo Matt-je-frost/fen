@@ -1065,7 +1065,21 @@ document.getElementById("av-wrap").addEventListener("click", function() { this.c
 __name(getVRHTML, "getVRHTML");
 var worker_default = {
   async scheduled(c, env, ctx) {
-    ctx.waitUntil(fenWake(env));
+    ctx.waitUntil((async function() {
+      if (await checkDeploy(env)) return;
+      var intervalMin = parseInt(await env.FEN_STATE.get("wake-interval-minutes") || "180");
+      if (intervalMin < 30) intervalMin = 30;
+      var lastWake = await env.FEN_STATE.get("last-wake");
+      var sinceLast = lastWake ? (Date.now() - new Date(lastWake).getTime()) / 60000 : 999;
+      var pendingWakes = await sbSel(env, "scheduled_wakes", "?status=eq.pending&scheduled_for=lte." + new Date().toISOString() + "&order=scheduled_for.asc&limit=1");
+      if (pendingWakes && pendingWakes.length > 0) {
+        var sw = pendingWakes[0];
+        await sbPatch(env, "scheduled_wakes", "?id=eq." + sw.id, { status: "completed", completed_at: new Date().toISOString() });
+        await fenWake(env, sw.intention);
+      } else if (sinceLast >= intervalMin) {
+        await fenWake(env);
+      }
+    })());
   },
   async fetch(request, env, ctx) {
     var url = new URL(request.url);
