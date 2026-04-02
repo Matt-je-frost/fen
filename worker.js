@@ -1193,6 +1193,14 @@ var worker_default = {
             } else {
               apiResult = { success: false, action: "artwork failed: " + (chatArtR.error || "unknown") };
             }
+          } else if (endpoint === "/self/create" && method === "POST") {
+            var cSlug = (data.slug || "untitled").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 80);
+            var chatCrR = await sbIns(env, "creations", { slug: cSlug, title: data.title || "Untitled", description: data.description || "", html_content: data.html_content || "", wake_number: null });
+            if (chatCrR && !chatCrR.error) {
+              apiResult = { success: true, action: "creation saved: " + (data.title || cSlug), url: "/create/" + cSlug };
+            } else {
+              apiResult = { success: false, action: "creation failed: " + (chatCrR.error || "unknown") };
+            }
           } else if (endpoint === "/self/email" && method === "POST") {
             var emResult = await sendEmail(env, data.to, data.subject, data.body || "", null);
             if (emResult.success) {
