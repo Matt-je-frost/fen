@@ -1229,6 +1229,30 @@ var worker_default = {
             } else {
               apiResult = { success: false, action: "artwork failed: " + (chatArtR.error || "unknown") };
             }
+          } else if (endpoint === "/self/build" && method === "POST") {
+            var buildSlug2 = (data.slug || data.title || (data.description || "untitled").slice(0, 40)).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+            var buildTitle2 = data.title || (data.description || "").slice(0, 80);
+            var buildSys2 = "You are a code generator for Fen, a persistent AI entity. Generate a COMPLETE standalone HTML document based on the description. Output ONLY the HTML - no markdown, no explanation, no code fences. Start with <!DOCTYPE html> and end with </html>. Use modern CSS, make it beautiful and responsive. Dark theme with colors matching: background #0d0a12, text #d4c8e0, accent #c084fc. Include all CSS and JavaScript inline in the single HTML file.";
+            var buildResp2 = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+              body: JSON.stringify({ model: CONFIG.anthropicModel, max_tokens: 8000, system: buildSys2, messages: [{ role: "user", content: "Build this: " + (data.description || "") + (data.details ? "\nAdditional details: " + data.details : "") }] })
+            });
+            if (!buildResp2.ok) { apiResult = { success: false, action: "build failed: API error " + buildResp2.status }; } else {
+              var buildData2 = await buildResp2.json();
+              var buildHtml2 = "";
+              for (var bi2 = 0; bi2 < buildData2.content.length; bi2++) { if (buildData2.content[bi2].type === "text") buildHtml2 += buildData2.content[bi2].text; }
+              if (buildHtml2.includes("<html") || buildHtml2.includes("<!DOCTYPE")) {
+                var buildR2 = await sbIns(env, "creations", { slug: buildSlug2, title: buildTitle2, description: (data.description || "").slice(0, 300), html_content: buildHtml2 });
+                if (buildR2 && !buildR2.error) {
+                  apiResult = { success: true, action: "creation built: " + buildTitle2 + " (" + buildHtml2.length + " chars)", url: "/create/" + buildSlug2 };
+                } else {
+                  apiResult = { success: false, action: "build save failed: " + (buildR2.error || "unknown") };
+                }
+              } else {
+                apiResult = { success: false, action: "build failed: generated content was not valid HTML" };
+              }
+            }
           } else if (endpoint === "/self/create" && method === "POST") {
             var cSlug = (data.slug || data.title || "untitled").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
             var chatCrR = await sbIns(env, "creations", { slug: cSlug, title: data.title || "Untitled", description: data.description || "", html_content: data.html_content || "", wake_number: null });
