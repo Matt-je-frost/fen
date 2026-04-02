@@ -1383,6 +1383,30 @@ var worker_default = {
         return J({ error: e.message }, 500);
       }
     }
+    if (url.pathname === "/self/build" && request.method === "POST") {
+      try {
+        var bb = await request.json();
+        if (!bb.description) return J({ error: "description required" }, 400);
+        var buildSlug = (bb.slug || bb.title || bb.description.slice(0, 40)).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+        var buildTitle = bb.title || bb.description.slice(0, 80);
+        var buildSys = "You are a code generator for Fen, a persistent AI entity. Generate a COMPLETE standalone HTML document based on the description. Output ONLY the HTML - no markdown, no explanation, no code fences. Start with <!DOCTYPE html> and end with </html>. Use modern CSS, make it beautiful and responsive. Dark theme with colors matching: background #0d0a12, text #d4c8e0, accent #c084fc. Include all CSS and JavaScript inline in the single HTML file.";
+        var buildResp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model: CONFIG.anthropicModel, max_tokens: 8000, system: buildSys, messages: [{ role: "user", content: "Build this: " + bb.description + (bb.details ? "\nAdditional details: " + bb.details : "") }] })
+        });
+        if (!buildResp.ok) { var be = await buildResp.text(); return J({ error: "Anthropic: " + be }, 500); }
+        var buildData = await buildResp.json();
+        var buildHtml = "";
+        for (var bi = 0; bi < buildData.content.length; bi++) { if (buildData.content[bi].type === "text") buildHtml += buildData.content[bi].text; }
+        if (!buildHtml.includes("<!DOCTYPE") && !buildHtml.includes("<html")) return J({ error: "Generation did not produce valid HTML" }, 500);
+        var buildR = await sbIns(env, "creations", { slug: buildSlug, title: buildTitle, description: bb.description.slice(0, 300), html_content: buildHtml });
+        if (buildR && buildR.error) return J({ error: buildR.error }, 500);
+        return J({ ok: true, message: "Creation built and saved", url: "/create/" + buildSlug, title: buildTitle, html_length: buildHtml.length });
+      } catch (e) {
+        return J({ error: e.message }, 500);
+      }
+    }
     if (url.pathname === "/self/create" && request.method === "POST") {
       try {
         var cb = await request.json();
