@@ -1246,6 +1246,31 @@ var worker_default = {
         return J({ error: e.message }, 500);
       }
     }
+    if (url.pathname.startsWith("/create/") && request.method === "GET") {
+      try {
+        var cSlug = url.pathname.slice(8);
+        if (!cSlug) return J({ error: "slug required" }, 400);
+        var cRows = await sbSel(env, "creations", "?slug=eq." + encodeURIComponent(cSlug) + "&limit=1");
+        if (!cRows || !cRows.length) return new Response("Not found", { status: 404 });
+        var cr = cRows[0];
+        await fetch(CONFIG.supabaseUrl + "/rest/v1/creations?id=eq." + cr.id, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "apikey": env.SUPABASE_KEY, "Authorization": "Bearer " + env.SUPABASE_KEY, "Prefer": "return=minimal" },
+          body: JSON.stringify({ view_count: (cr.view_count || 0) + 1 })
+        });
+        return new Response(cr.html_content, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+      } catch (e) {
+        return J({ error: e.message }, 500);
+      }
+    }
+    if (url.pathname === "/create" && request.method === "GET") {
+      try {
+        var cList = await sbSel(env, "creations", "?order=created_at.desc&select=slug,title,description,created_at,view_count");
+        return J(cList || []);
+      } catch (e) {
+        return J({ error: e.message }, 500);
+      }
+    }
     if (url.pathname === "/inbound" && request.method === "POST") {
       try {
         var event = await request.json();
