@@ -547,6 +547,20 @@ function rGallery(){
   .catch(function(e){el.innerHTML='<p class="es">Error: '+e.message+'</p>';});
 }
 
+function rCreations(){
+  var el=document.getElementById('tc');
+  el.innerHTML='<p class="es">Loading creations...</p>';
+  fetch('/create').then(function(r){return r.json();}).then(function(items){
+    if(!items||!items.length){el.innerHTML='<p class="es">No creations yet.</p>';return;}
+    el.innerHTML=items.map(function(c){
+      var d=new Date(c.created_at);
+      var dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+      var views=c.view_count||0;
+      return '<div style="padding:14px;margin-bottom:12px;background:var(--sf);border:1px solid var(--bd);border-radius:2px"><div class="wm"><span class="wn">'+x(c.title||'Untitled')+'</span><span>'+dateStr+'</span></div>'+(c.description?'<div style="font-size:12px;color:var(--txd);margin:6px 0;line-height:1.5">'+x(c.description)+'</div>':'')+'<div style="display:flex;align-items:center;gap:12px;margin-top:8px"><a href="/create/'+x(c.slug)+'" target="_blank" style="font-family:JetBrains Mono,monospace;font-size:11px;color:var(--ac);text-decoration:none">visit creation &#8594;</a><span style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--txf)">'+views+' view'+(views!==1?'s':'')+'</span></div></div>';
+    }).join('');
+  }).catch(function(e){el.innerHTML='<p class="es">Error: '+e.message+'</p>';});
+}
+
 function rDev(){
   document.getElementById("tc").innerHTML='<div class="dt">self-modification</div><button class="db go" id="d1">read own code</button><button class="db" id="d2">recent wakes</button><button class="db" id="d3">memories</button><button class="db" id="d4">trigger wake</button><div id="dout" class="dout" style="display:none"></div><div class="dt">patch api</div><div class="dn">window.fen.patchCode(find, replace, description)</div>';
   function out(s){var e=document.getElementById("dout");e.style.display="block";e.textContent=s;}
