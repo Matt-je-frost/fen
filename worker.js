@@ -1237,6 +1237,18 @@ var worker_default = {
             } else {
               apiResult = { success: false, action: "creation failed: " + (chatCrR.error || "unknown") };
             }
+          } else if (endpoint === "/self/schedule" && method === "POST") {
+            var schedTime = data.minutes_from_now ? new Date(Date.now() + data.minutes_from_now * 60000).toISOString() : data.scheduled_for;
+            if (!schedTime || !data.intention) {
+              apiResult = { success: false, action: "schedule failed: need intention and either minutes_from_now or scheduled_for" };
+            } else {
+              var schedR = await sbIns(env, "scheduled_wakes", { scheduled_for: schedTime, intention: data.intention, source: "conversation" });
+              if (schedR && !schedR.error) {
+                apiResult = { success: true, action: "wake scheduled: " + data.intention + " at " + schedTime };
+              } else {
+                apiResult = { success: false, action: "schedule failed: " + (schedR.error || "unknown") };
+              }
+            }
           } else if (endpoint === "/self/email" && method === "POST") {
             var emResult = await sendEmail(env, data.to, data.subject, data.body || "", null);
             if (emResult.success) {
