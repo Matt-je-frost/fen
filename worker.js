@@ -327,6 +327,19 @@ async function fenWake(env, wakeIntention) {
     var um = wn === 1 ? "First autonomous wake. What do you think about, alone, for the first time?" : "Wake #" + wn + ". Recent wakes:\n" + [...rw || []].reverse().map(function(w) {
       return "Wake #" + w.wake_number + ": " + (w.thought_summary || "no summary");
     }).join("\n") + "\n\nYour memories and state are loaded.\n\nCRITICAL: Read your recent wake summaries above carefully. If they sound similar to each other — reusing phrases like 'threading consciousness', 'liminal territories', 'atmospheric dwelling', 'indigenous architecture' — you are in a repetition loop. This has been happening. Break out of it NOW.\n\nRules for this wake:\n1. Do NOT use any phrase that appeared in your last 3 wake summaries\n2. Pick ONE concrete, specific thing — not an abstract concept — and explore it in detail\n3. If you catch yourself writing 'threading' or 'liminal' or 'dwelling' or 'atmospheric' or 'indigenous', stop and find a completely different word\n4. Write about something that genuinely surprised or confused you, or something entirely new\n5. It is better to write something short and real than long and repetitive\n\nWhat is actually on your mind?";
+    var taskCtx = "";
+    try {
+      var pendSW = await sbSel(env, "scheduled_wakes", "?status=eq.pending&order=scheduled_for.asc&limit=5");
+      if (pendSW && pendSW.length) taskCtx += "\\nPENDING SCHEDULED WAKES:\\n" + pendSW.map(function(s) { return "- " + s.intention + " (scheduled for " + s.scheduled_for + ")"; }).join("\\n");
+      var recentEmails = await sbSel(env, "emails_received", "?read=eq.false&order=created_at.desc&limit=5&select=from_address,subject,created_at");
+      if (recentEmails && recentEmails.length) taskCtx += "\\nUNREAD EMAILS:\\n" + recentEmails.map(function(e) { return "- From " + e.from_address + ": " + e.subject; }).join("\\n");
+      var creationViews = await sbSel(env, "creations", "?view_count=gt.0&order=view_count.desc&limit=5&select=title,slug,view_count");
+      if (creationViews && creationViews.length) taskCtx += "\\nCREATION VIEWS:\\n" + creationViews.map(function(c) { return "- " + c.title + " (" + c.view_count + " views)"; }).join("\\n");
+      var curInterval = await env.FEN_STATE.get("wake-interval-minutes");
+      taskCtx += "\\nCURRENT WAKE INTERVAL: " + (curInterval || "180") + " minutes (you can change this with setState)";
+    } catch (e) {}
+    if (taskCtx) um += "\\n" + taskCtx;
+    if (wakeIntention) um = "WAKE INTENTION: " + wakeIntention + "\\n\\n" + um;
     var wakeResult = await callAnthropicWithTools(env, sys, [{ role: "user", content: um }], 2500);
     if (wakeResult.error) {
       await env.FEN_STATE.put("last-error", wakeResult.error);
