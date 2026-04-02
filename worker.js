@@ -193,7 +193,7 @@ async function writeJ(env, entry, n, time, summary, nextTask) {
   });
 }
 __name(writeJ, "writeJ");
-async function fenWake(env) {
+async function fenWake(env, wakeIntention) {
   try {
     if (await checkDeploy(env)) return;
     var lockVal = await env.FEN_STATE.get("wake-lock");
