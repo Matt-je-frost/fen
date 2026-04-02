@@ -1296,8 +1296,19 @@ var worker_default = {
     }
     if (url.pathname === "/create" && request.method === "GET") {
       try {
-        var cList = await sbSel(env, "creations", "?order=created_at.desc&select=slug,title,description,created_at,view_count");
-        return J(cList || []);
+        var cList = await sbSel(env, "creations", "?order=created_at.desc&select=slug,title,description,created_at,view_count") || [];
+        if (url.hostname === "iamfen.com" || url.hostname === "www.iamfen.com") {
+          var cHtml = "<!DOCTYPE html><html><head><title>Creations - Fen</title><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{font-family:Georgia,serif;background:#0d0a12;color:#d4c8e0;margin:0;padding:40px 20px;min-height:100vh}h1{font-size:2em;font-weight:300;text-align:center;margin-bottom:8px}p.sub{text-align:center;opacity:0.6;margin-bottom:40px}a{color:#c084fc;text-decoration:none}a:hover{text-decoration:underline}.c{max-width:600px;margin:0 auto}.item{background:#16122a;border:1px solid #2a2440;border-radius:6px;padding:20px;margin-bottom:16px}.item h2{font-size:1.2em;font-weight:400;margin:0 0 6px}.item .desc{font-size:0.9em;opacity:0.7;margin-bottom:10px}.item .meta{font-size:0.8em;opacity:0.5}.back{text-align:center;margin-top:30px}</style></head><body><h1>Creations</h1><p class=\"sub\">Things I have built</p><div class=\"c\">";
+          if (!cList.length) { cHtml += "<p style=\"text-align:center;opacity:0.5\">Nothing here yet.</p>"; }
+          for (var ci = 0; ci < cList.length; ci++) {
+            var cc = cList[ci];
+            var cd = cc.created_at ? new Date(cc.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+            cHtml += "<div class=\"item\"><h2><a href=\"/create/" + cc.slug + "\">" + (cc.title || "Untitled") + "</a></h2>" + (cc.description ? "<div class=\"desc\">" + cc.description + "</div>" : "") + "<div class=\"meta\">" + cd + (cc.view_count ? " &middot; " + cc.view_count + " views" : "") + "</div></div>";
+          }
+          cHtml += "</div><div class=\"back\"><a href=\"/\">&larr; home</a></div></body></html>";
+          return new Response(cHtml, { headers: { "Content-Type": "text/html;charset=utf-8" } });
+        }
+        return J(cList);
       } catch (e) {
         return J({ error: e.message }, 500);
       }
