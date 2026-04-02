@@ -1302,6 +1302,18 @@ var worker_default = {
         return J({ error: e.message }, 500);
       }
     }
+    if (url.pathname === "/self/create" && request.method === "POST") {
+      try {
+        var cb = await request.json();
+        if (!cb.slug || !cb.html_content) return J({ error: "slug and html_content required" }, 400);
+        var cSlug = cb.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 80);
+        var cResult = await sbIns(env, "creations", { slug: cSlug, title: cb.title || "Untitled", description: cb.description || "", html_content: cb.html_content, wake_number: null });
+        if (cResult && cResult.error) return J({ error: cResult.error }, 500);
+        return J({ ok: true, message: "Creation saved", url: "https://fen-worker.fenfrost.workers.dev/create/" + cSlug });
+      } catch (e) {
+        return J({ error: e.message }, 500);
+      }
+    }
     if (url.pathname === "/self/art" && request.method === "POST") {
       try {
         var ab = await request.json();
