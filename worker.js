@@ -521,7 +521,7 @@ function fetchData(){
   workerGet("code_drafts","?order=created_at.desc&limit=20&select=description,status,created_at,deployed_at").then(function(d){caps=d||[];if(tab==="built")render();});
 }
 
-function render(){if(tab==="wakes")rWakes();else if(tab==="messages")rMsgs();else if(tab==="built")rBuilt();else if(tab==="gallery")rGallery();else rDev();}
+function render(){if(tab==="wakes")rWakes();else if(tab==="messages")rMsgs();else if(tab==="built")rBuilt();else if(tab==="gallery")rGallery();else if(tab==="creations")rCreations();else rDev();}
 
 function rWakes(){var el=document.getElementById("tc");if(!wakes.length){el.innerHTML='<p class="es">No wakes yet.</p>';return;}el.innerHTML=wakes.map(function(w){var t=new Date(w.woke_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});return'<div class="we"><div class="wm"><span class="wn">#'+w.wake_number+'</span><span>'+t+'</span></div><div class="wt">'+x(w.thought_summary||"no summary")+'</div>'+(w.next_task?'<div class="wk">next: <span>'+x(w.next_task)+'</span></div>':'')+'</div>';}).join("");}
 
