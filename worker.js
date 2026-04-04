@@ -78,6 +78,7 @@ async function sendEmail(env, to, subject, body, wakeNum) {
   if (result.id) {
     await env.FEN_STATE.put("emails-today-count", String(parseInt(dailyCount) + 1));
     await sbIns(env, "emails_sent", { wake_number: wakeNum || null, to_address: to, subject: subject, body: body, resend_id: result.id });
+    try { await sbPatch(env, "emails_received", "?from_address=eq." + encodeURIComponent(to) + "&read=eq.false", { read: true }); } catch(e) {}
     return { success: true, id: result.id };
   }
   return { error: result.message || "send failed" };
