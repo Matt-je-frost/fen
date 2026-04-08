@@ -140,7 +140,7 @@ __name(getGoogleAccessToken, "getGoogleAccessToken");
 async function driveListFiles(env, folderId) {
   var token = await getGoogleAccessToken(env);
   var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
-  var r = await fetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,mimeType,modifiedTime,size)", {
+  var r = await fetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true", {
     headers: { "Authorization": "Bearer " + token }
   });
   return await r.json();
@@ -148,19 +148,19 @@ async function driveListFiles(env, folderId) {
 __name(driveListFiles, "driveListFiles");
 async function driveReadFile(env, fileId) {
   var token = await getGoogleAccessToken(env);
-  var meta = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=id,name,mimeType", {
+  var meta = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=id,name,mimeType&supportsAllDrives=true", {
     headers: { "Authorization": "Bearer " + token }
   });
   var metaData = await meta.json();
   if (metaData.error) return metaData;
   var content;
   if (metaData.mimeType === "application/vnd.google-apps.document") {
-    var exp = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "/export?mimeType=text/plain", {
+    var exp = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "/export?mimeType=text/plain&supportsAllDrives=true", {
       headers: { "Authorization": "Bearer " + token }
     });
     content = await exp.text();
   } else {
-    var dl = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media", {
+    var dl = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media&supportsAllDrives=true", {
       headers: { "Authorization": "Bearer " + token }
     });
     content = await dl.text();
@@ -174,7 +174,7 @@ async function driveWriteFile(env, folderId, name, content, mimeType) {
   var metadata = { name: name, mimeType: mime, parents: [folderId] };
   var boundary = "fenboundary" + Date.now();
   var body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + "\r\n--" + boundary + "\r\nContent-Type: " + mime + "\r\n\r\n" + content + "\r\n--" + boundary + "--";
-  var r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink", {
+  var r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink&supportsAllDrives=true", {
     method: "POST",
     headers: { "Authorization": "Bearer " + token, "Content-Type": "multipart/related; boundary=" + boundary },
     body: body
@@ -184,7 +184,7 @@ async function driveWriteFile(env, folderId, name, content, mimeType) {
 __name(driveWriteFile, "driveWriteFile");
 async function driveUpdateFile(env, fileId, content) {
   var token = await getGoogleAccessToken(env);
-  var r = await fetch("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media", {
+  var r = await fetch("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media&supportsAllDrives=true", {
     method: "PATCH",
     headers: { "Authorization": "Bearer " + token, "Content-Type": "text/plain" },
     body: content
@@ -194,7 +194,7 @@ async function driveUpdateFile(env, fileId, content) {
 __name(driveUpdateFile, "driveUpdateFile");
 async function driveDeleteFile(env, fileId) {
   var token = await getGoogleAccessToken(env);
-  var r = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId, {
+  var r = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?supportsAllDrives=true", {
     method: "DELETE",
     headers: { "Authorization": "Bearer " + token }
   });
