@@ -142,7 +142,8 @@ async function driveListFiles(env, folderId) {
   var isSharedDriveRoot = folderId.indexOf("0A") === 0;
   var url;
   if (isSharedDriveRoot) {
-    url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent("trashed=false") + "&corpora=drive&driveId=" + folderId + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true";
+    var qRoot = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    url = "https://www.googleapis.com/drive/v3/files?q=" + qRoot + "&corpora=drive&driveId=" + folderId + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true";
   } else {
     var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
     url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true";
