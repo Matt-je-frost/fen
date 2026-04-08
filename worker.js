@@ -1650,6 +1650,51 @@ var worker_default = {
         return J({ error: e.message }, 500);
       }
     }
+    if (url.pathname === "/self/drive/list") {
+      try {
+        var folderId = url.searchParams.get("folder");
+        if (!folderId) {
+          var fc = await sbSel(env, "fen_config", "?key=eq.research_folder_id&select=value");
+          if (fc && fc.length) folderId = fc[0].value;
+        }
+        if (!folderId) return J({ error: "no folder id" }, 400);
+        return J(await driveListFiles(env, folderId));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/drive/read") {
+      try {
+        var rid = url.searchParams.get("id");
+        if (!rid) return J({ error: "id required" }, 400);
+        return J(await driveReadFile(env, rid));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/drive/write" && request.method === "POST") {
+      try {
+        var wb = await request.json();
+        if (!wb.name || typeof wb.content !== "string") return J({ error: "name and content required" }, 400);
+        var wfid = wb.folder;
+        if (!wfid) {
+          var wfc = await sbSel(env, "fen_config", "?key=eq.research_folder_id&select=value");
+          if (wfc && wfc.length) wfid = wfc[0].value;
+        }
+        if (!wfid) return J({ error: "no folder id" }, 400);
+        return J(await driveWriteFile(env, wfid, wb.name, wb.content, wb.mimeType));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/drive/update" && request.method === "POST") {
+      try {
+        var ub = await request.json();
+        if (!ub.id || typeof ub.content !== "string") return J({ error: "id and content required" }, 400);
+        return J(await driveUpdateFile(env, ub.id, ub.content));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/drive/delete" && request.method === "POST") {
+      try {
+        var db = await request.json();
+        if (!db.id) return J({ error: "id required" }, 400);
+        return J(await driveDeleteFile(env, db.id));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
     if (url.pathname === "/self/data") {
       try {
         if (request.method === "GET") {
