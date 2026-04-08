@@ -69,6 +69,20 @@ async function sendEmail(env, to, subject, body, wakeNum) {
   var today = new Date().toISOString().slice(0, 10);
   if (dailyDate !== today) { dailyCount = "0"; await env.FEN_STATE.put("emails-today-date", today); }
   if (parseInt(dailyCount) >= 5) return { error: "daily email limit reached (5/day)" };
+  try {
+    var lastSend = await sbSel(env, "emails_sent", "?to_address=eq." + encodeURIComponent(to) + "&order=created_at.desc&limit=1&select=created_at");
+    if (lastSend && lastSend.length) {
+      var lastSendAt = lastSend[0].created_at;
+      var replyAfter = await sbSel(env, "emails_received", "?from_address=eq." + encodeURIComponent(to) + "&created_at=gt." + encodeURIComponent(lastSendAt) + "&limit=1&select=id");
+      if (!replyAfter || !replyAfter.length) {
+        var hoursSince = (Date.now() - new Date(lastSendAt).getTime()) / 3600000;
+        if (hoursSince < 96) {
+          var hoursLeft = Math.ceil(96 - hoursSince);
+          return { error: "cooldown active for " + to + ": you last emailed them " + Math.floor(hoursSince) + " hours ago and they have not replied. Wait " + hoursLeft + " more hours, or until they reply, before sending again. This prevents accidental duplicate outreach." };
+        }
+      }
+    }
+  } catch (cooldownErr) {}
   var r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
