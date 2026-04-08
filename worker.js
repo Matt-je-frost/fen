@@ -139,8 +139,15 @@ async function getGoogleAccessToken(env) {
 __name(getGoogleAccessToken, "getGoogleAccessToken");
 async function driveListFiles(env, folderId) {
   var token = await getGoogleAccessToken(env);
-  var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
-  var r = await fetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true", {
+  var isSharedDriveRoot = folderId.indexOf("0A") === 0;
+  var url;
+  if (isSharedDriveRoot) {
+    url = "https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent("trashed=false") + "&corpora=drive&driveId=" + folderId + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true";
+  } else {
+    var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    url = "https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,mimeType,modifiedTime,size)&supportsAllDrives=true&includeItemsFromAllDrives=true";
+  }
+  var r = await fetch(url, {
     headers: { "Authorization": "Bearer " + token }
   });
   return await r.json();
