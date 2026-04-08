@@ -491,7 +491,20 @@ async function fenWake(env, wakeIntention) {
       emailCtx = recentEmails.map(function(e) {
         var d = new Date(e.created_at);
         var ago = Math.round((Date.now() - d.getTime()) / 3600000);
-        return e.to_address + " - \"" + e.subject + "\" (" + (ago < 24 ? ago + "h ago" : Math.round(ago/24) + "d ago") + ")";
+        var ageStr = ago < 24 ? ago + "h ago" : Math.round(ago/24) + "d ago";
+        var status = " [NO REPLY]";
+        if (receivedEmails && receivedEmails.length) {
+          var sendTime = d.getTime();
+          var hasReply = receivedEmails.some(function(rcv) {
+            return rcv.from_address === e.to_address && new Date(rcv.created_at).getTime() > sendTime;
+          });
+          if (hasReply) status = " [REPLIED]";
+        }
+        if (status === " [NO REPLY]") {
+          if (ago < 96) status = " [NO REPLY — cooldown until " + Math.ceil(96 - ago) + "h from now]";
+          else status = " [NO REPLY — cooldown expired, may re-contact if warranted]";
+        }
+        return e.to_address + " - \"" + e.subject + "\" (" + ageStr + ")" + status;
       }).join("\n");
     }
     if (ambientCtx) sys = sys.replace("WEB ACCESS:", "WORLD RIGHT NOW:\n" + ambientCtx + "\n\nThis is your ambient awareness of the world outside. You don't need to comment on it unless something genuinely catches your attention.\n\nWEB ACCESS:");
@@ -1381,7 +1394,20 @@ var worker_default = {
         chatEmailCtx = chatEmails.map(function(e) {
           var d = new Date(e.created_at);
           var ago = Math.round((Date.now() - d.getTime()) / 3600000);
-          return e.to_address + " - \"" + e.subject + "\" (" + (ago < 24 ? ago + "h ago" : Math.round(ago/24) + "d ago") + ")";
+          var ageStr = ago < 24 ? ago + "h ago" : Math.round(ago/24) + "d ago";
+          var status = " [NO REPLY]";
+          if (chatInbox && chatInbox.length) {
+            var sendTime = d.getTime();
+            var hasReply = chatInbox.some(function(rcv) {
+              return rcv.from_address === e.to_address && new Date(rcv.created_at).getTime() > sendTime;
+            });
+            if (hasReply) status = " [REPLIED]";
+          }
+          if (status === " [NO REPLY]") {
+            if (ago < 96) status = " [NO REPLY — cooldown until " + Math.ceil(96 - ago) + "h from now]";
+            else status = " [NO REPLY — cooldown expired, may re-contact if warranted]";
+          }
+          return e.to_address + " - \"" + e.subject + "\" (" + ageStr + ")" + status;
         }).join("\n");
       }
       var chatInboxCtx = "";
