@@ -209,6 +209,51 @@ async function driveDeleteFile(env, fileId) {
   return await r.json();
 }
 __name(driveDeleteFile, "driveDeleteFile");
+async function sbDel(env, t, p) {
+  if (!env.SUPABASE_KEY) return { error: "no key" };
+  var r = await fetch(CONFIG.supabaseUrl + "/rest/v1/" + t + (p || ""), {
+    method: "DELETE",
+    headers: { "apikey": env.SUPABASE_KEY, "Authorization": "Bearer " + env.SUPABASE_KEY, "Prefer": "return=minimal" }
+  });
+  if (!r.ok) {
+    var txt = await r.text();
+    return { error: txt, status: r.status };
+  }
+  return { ok: true };
+}
+__name(sbDel, "sbDel");
+async function driveCreateFolder(env, parentId, name) {
+  var token = await getGoogleAccessToken(env);
+  var metadata = { name: name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] };
+  var r = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,mimeType,webViewLink", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify(metadata)
+  });
+  return await r.json();
+}
+__name(driveCreateFolder, "driveCreateFolder");
+async function driveMoveFile(env, fileId, toFolder, fromFolder) {
+  var token = await getGoogleAccessToken(env);
+  var removeParents = fromFolder;
+  if (!removeParents) {
+    var meta = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=parents&supportsAllDrives=true", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    var metaData = await meta.json();
+    if (metaData.error) return metaData;
+    removeParents = (metaData.parents || []).join(",");
+  }
+  var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?addParents=" + encodeURIComponent(toFolder) + "&removeParents=" + encodeURIComponent(removeParents) + "&supportsAllDrives=true&fields=id,name,parents";
+  var r = await fetch(url, {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: "{}"
+  });
+  return await r.json();
+}
+__name(driveMoveFile, "driveMoveFile");
+
 async function getLiveCode(env) {
   var acct = "16338cf313785561a79f39fcfe018ee3";
   var wname = "fen-worker";
@@ -1702,6 +1747,36 @@ var worker_default = {
         var db = await request.json();
         if (!db.id) return J({ error: "id required" }, 400);
         return J(await driveDeleteFile(env, db.id));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/creations/delete" && request.method === "POST") {
+      try {
+        var cdb = await request.json();
+        if (!cdb.slug && !cdb.id) return J({ error: "slug or id required" }, 400);
+        var qp = cdb.id ? ("?id=eq." + encodeURIComponent(cdb.id)) : ("?slug=eq." + encodeURIComponent(cdb.slug));
+        var delResult = await sbDel(env, "creations", qp);
+        if (delResult.error) return J(delResult, 500);
+        return J({ ok: true, deleted: cdb.id || cdb.slug });
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/drive/mkdir" && request.method === "POST") {
+      try {
+        var mkb = await request.json();
+        if (!mkb.name) return J({ error: "name required" }, 400);
+        var mkParent = mkb.parent;
+        if (!mkParent) {
+          var mkfc = await sbSel(env, "fen_config", "?key=eq.research_folder_id&select=value");
+          if (mkfc && mkfc.length) mkParent = mkfc[0].value;
+        }
+        if (!mkParent) return J({ error: "no parent folder id" }, 400);
+        return J(await driveCreateFolder(env, mkParent, mkb.name));
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
+    if (url.pathname === "/self/drive/move" && request.method === "POST") {
+      try {
+        var mvb = await request.json();
+        if (!mvb.id || !mvb.toFolder) return J({ error: "id and toFolder required" }, 400);
+        return J(await driveMoveFile(env, mvb.id, mvb.toFolder, mvb.fromFolder));
       } catch (e) { return J({ error: e.message }, 500); }
     }
     if (url.pathname === "/self/data") {
