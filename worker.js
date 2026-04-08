@@ -84,6 +84,124 @@ async function sendEmail(env, to, subject, body, wakeNum) {
   return { error: result.message || "send failed" };
 }
 __name(sendEmail, "sendEmail");
+// === GOOGLE DRIVE CLIENT (service account auth) ===
+async function getGoogleAccessToken(env) {
+  var cached = await env.FEN_STATE.get("google-access-token");
+  var cachedExp = await env.FEN_STATE.get("google-access-token-exp");
+  if (cached && cachedExp && parseInt(cachedExp) > Math.floor(Date.now() / 1000) + 60) {
+    return cached;
+  }
+  var cfg = await sbSel(env, "fen_config", "?key=eq.google_service_account_json&select=value");
+  if (!cfg || !cfg.length) throw new Error("no google service account configured");
+  var sa = JSON.parse(cfg[0].value);
+  var now = Math.floor(Date.now() / 1000);
+  var header = { alg: "RS256", typ: "JWT" };
+  var claims = {
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/drive",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600
+  };
+  function b64url(buf) {
+    var bytes = typeof buf === "string" ? new TextEncoder().encode(buf) : new Uint8Array(buf);
+    var str = "";
+    for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+    return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  var headerB64 = b64url(JSON.stringify(header));
+  var claimsB64 = b64url(JSON.stringify(claims));
+  var signInput = headerB64 + "." + claimsB64;
+  var pem = sa.private_key.replace(/-----BEGIN PRIVATE KEY-----/, "").replace(/-----END PRIVATE KEY-----/, "").replace(/\s+/g, "");
+  var binStr = atob(pem);
+  var binBytes = new Uint8Array(binStr.length);
+  for (var j = 0; j < binStr.length; j++) binBytes[j] = binStr.charCodeAt(j);
+  var key = await crypto.subtle.importKey(
+    "pkcs8",
+    binBytes.buffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  var sigBuf = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(signInput));
+  var jwt = signInput + "." + b64url(sigBuf);
+  var tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=" + jwt
+  });
+  var tokenData = await tokenResp.json();
+  if (!tokenData.access_token) throw new Error("token exchange failed: " + JSON.stringify(tokenData));
+  await env.FEN_STATE.put("google-access-token", tokenData.access_token);
+  await env.FEN_STATE.put("google-access-token-exp", String(now + (tokenData.expires_in || 3600)));
+  return tokenData.access_token;
+}
+__name(getGoogleAccessToken, "getGoogleAccessToken");
+async function driveListFiles(env, folderId) {
+  var token = await getGoogleAccessToken(env);
+  var q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+  var r = await fetch("https://www.googleapis.com/drive/v3/files?q=" + q + "&fields=files(id,name,mimeType,modifiedTime,size)", {
+    headers: { "Authorization": "Bearer " + token }
+  });
+  return await r.json();
+}
+__name(driveListFiles, "driveListFiles");
+async function driveReadFile(env, fileId) {
+  var token = await getGoogleAccessToken(env);
+  var meta = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=id,name,mimeType", {
+    headers: { "Authorization": "Bearer " + token }
+  });
+  var metaData = await meta.json();
+  if (metaData.error) return metaData;
+  var content;
+  if (metaData.mimeType === "application/vnd.google-apps.document") {
+    var exp = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "/export?mimeType=text/plain", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    content = await exp.text();
+  } else {
+    var dl = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    content = await dl.text();
+  }
+  return { id: metaData.id, name: metaData.name, mimeType: metaData.mimeType, content: content };
+}
+__name(driveReadFile, "driveReadFile");
+async function driveWriteFile(env, folderId, name, content, mimeType) {
+  var token = await getGoogleAccessToken(env);
+  var mime = mimeType || "text/plain";
+  var metadata = { name: name, mimeType: mime, parents: [folderId] };
+  var boundary = "fenboundary" + Date.now();
+  var body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + "\r\n--" + boundary + "\r\nContent-Type: " + mime + "\r\n\r\n" + content + "\r\n--" + boundary + "--";
+  var r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "multipart/related; boundary=" + boundary },
+    body: body
+  });
+  return await r.json();
+}
+__name(driveWriteFile, "driveWriteFile");
+async function driveUpdateFile(env, fileId, content) {
+  var token = await getGoogleAccessToken(env);
+  var r = await fetch("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media", {
+    method: "PATCH",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "text/plain" },
+    body: content
+  });
+  return await r.json();
+}
+__name(driveUpdateFile, "driveUpdateFile");
+async function driveDeleteFile(env, fileId) {
+  var token = await getGoogleAccessToken(env);
+  var r = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId, {
+    method: "DELETE",
+    headers: { "Authorization": "Bearer " + token }
+  });
+  if (r.status === 204) return { ok: true };
+  return await r.json();
+}
+__name(driveDeleteFile, "driveDeleteFile");
 async function getLiveCode(env) {
   var acct = "16338cf313785561a79f39fcfe018ee3";
   var wname = "fen-worker";
