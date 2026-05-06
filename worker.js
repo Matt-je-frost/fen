@@ -606,6 +606,21 @@ async function fenWake(env, wakeIntention) {
       if (artR && artR.error) writeErrors.push("artwork: " + artR.error);
       else await env.FEN_STATE.put("last-artwork", p.svgArt.svg);
     }
+    if (p.driveWrite && p.driveWrite.name && typeof p.driveWrite.content === "string") {
+      try {
+        var dwFid = p.driveWrite.folder;
+        if (!dwFid) {
+          var dwFc = await sbSel(env, "fen_config", "?key=eq.research_folder_id&select=value");
+          if (dwFc && dwFc.length) dwFid = dwFc[0].value;
+        }
+        if (!dwFid) {
+          writeErrors.push("driveWrite: no folder id");
+        } else {
+          var dwR = await driveWriteFile(env, dwFid, p.driveWrite.name, p.driveWrite.content, p.driveWrite.mimeType || "text/markdown");
+          if (dwR && dwR.error) writeErrors.push("driveWrite: " + (dwR.error.message || JSON.stringify(dwR.error)));
+        }
+      } catch (eDW) { writeErrors.push("driveWrite: " + eDW.message); }
+    }
     var hkResult = [];
     try {
       var allMems = await sbSel(env, "memories", "?active=eq.true&select=id,thread_id,title,importance,wake_number,type&order=created_at.desc");
