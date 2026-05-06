@@ -677,6 +677,8 @@ document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click"
 
 startAvatar();
 fetchStatus();fetchData();fetchTheme();
+function restoreSession(){fetch('/self/data?table=chat_sessions&params='+encodeURIComponent('?order=updated_at.desc&limit=1&select=session_id,messages,updated_at')).then(function(r){return r.json();}).then(function(rows){if(!rows||!rows.length)return;var s=rows[0];var ageMs=Date.now()-new Date(s.updated_at).getTime();if(ageMs>21600000)return;var ms;try{ms=typeof s.messages==='string'?JSON.parse(s.messages):s.messages;}catch(e){return;}if(!ms||!ms.length)return;sessionId=s.session_id;hist=ms.slice();ms.forEach(function(m){if(m.role==='user'||m.role==='assistant'){bubble(m.role==='user'?'matt':'fen',m.content||'',m.apiCalls);}});}).catch(function(){});}
+restoreSession();
 setInterval(function(){fetchStatus();fetchData();},30000);
 setInterval(fetchTheme,60000);
 
