@@ -558,7 +558,7 @@ async function fenWake(env, wakeIntention) {
     await env.FEN_STATE.put("wake-count", wn.toString());
     await env.FEN_STATE.put("wake-lock", "");
     var writeErrors = [];
-    var r1 = await sbIns(env, "wakes", { wake_number: wn, woke_at: wt, thought_summary: p.thoughtSummary || null, journal_entry: p.journalEntry || null, next_task: p.nextTask || null });
+    var r1 = await sbIns(env, "wakes", { wake_number: wn, woke_at: wt, thought_summary: p.thoughtSummary || null, journal_entry: p.journalEntry || null, next_task: p.nextTask || null, chosen_mode: p.chosenMode || null, why: p.why || null, completion_condition: p.completionCondition || null, completion_evidence: p.completionEvidence || null, meta_note: p.metaNote || null });
     if (r1 && r1.error) writeErrors.push("wakes: " + r1.error);
     if (p.messageForMatt) {
       var r2 = await sbIns(env, "messages", { wake_number: wn, content: p.messageForMatt });
