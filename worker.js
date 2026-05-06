@@ -1284,7 +1284,7 @@ if (navigator.xr) {
 // \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80 Init \xE2\x94\x80\xE2\x94\x80\xE2\x94\x80
 init();
 fetchState();
-setInterval(function() { fetchState(); checkParticleCount(); }, 30000);
+setInterval(function() { fetchState(); checkParticleCount(); }, 5000);
 
 document.getElementById("av-wrap").addEventListener("click", function() { this.classList.toggle("collapsed"); });
 
