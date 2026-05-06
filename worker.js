@@ -1837,6 +1837,33 @@ var worker_default = {
         return J(await driveMoveFile(env, mvb.id, mvb.toFolder, mvb.fromFolder));
       } catch (e) { return J({ error: e.message }, 500); }
     }
+    if (url.pathname === "/self/see") {
+      try {
+        var seeBody = request.method === "POST" ? await request.json().catch(function(){return {};}) : {};
+        var fullPage = !!seeBody.fullPage;
+        var vpW = seeBody.width || 1470;
+        var vpH = seeBody.height || 800;
+        var brResp = await fetch("https://api.cloudflare.com/client/v4/accounts/" + env.CLOUDFLARE_ACCOUNT_ID + "/browser-rendering/screenshot", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + env.CLOUDFLARE_API_TOKEN, "Content-Type": "application/json" },
+          body: JSON.stringify({ url: "https://fen-worker.fenfrost.workers.dev/", viewport: { width: vpW, height: vpH }, screenshotOptions: { fullPage: fullPage }, gotoOptions: { waitUntil: "networkidle2", timeout: 8000 } })
+        });
+        if (!brResp.ok) {
+          var errTxt = await brResp.text();
+          return J({ error: "browser rendering failed", status: brResp.status, detail: errTxt.slice(0, 500) }, 500);
+        }
+        var imgBuf = await brResp.arrayBuffer();
+        var bytes = new Uint8Array(imgBuf);
+        var binary = "";
+        for (var bi = 0; bi < bytes.length; bi++) binary += String.fromCharCode(bytes[bi]);
+        var b64 = btoa(binary);
+        var dataUrl = "data:image/png;base64," + b64;
+        try {
+          await sbIns(env, "artworks", { wake_number: null, title: "self-view " + new Date().toISOString().slice(0,19), svg_code: dataUrl, mood: "self-perception", warmth: null });
+        } catch (eS) {}
+        return J({ ok: true, dataUrl: dataUrl, size: bytes.length });
+      } catch (e) { return J({ error: e.message }, 500); }
+    }
     if (url.pathname === "/self/capabilities") {
       return J({
         note: "Canonical list of Fen self endpoints. If you call something not in this list, it will fail with a 404 and an error message — do not assume success.",
