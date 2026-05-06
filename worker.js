@@ -1843,9 +1843,16 @@ var worker_default = {
         var fullPage = !!seeBody.fullPage;
         var vpW = seeBody.width || 1470;
         var vpH = seeBody.height || 800;
-        var brResp = await fetch("https://api.cloudflare.com/client/v4/accounts/" + env.CLOUDFLARE_ACCOUNT_ID + "/browser-rendering/screenshot", {
+        var seeAcc = env.CLOUDFLARE_ACCOUNT_ID;
+        var seeTok = env.CLOUDFLARE_API_TOKEN;
+        if (!seeAcc || !seeTok) {
+          var seeCfg = await sbSel(env, "fen_config", "?key=in.(cloudflare_account_id,cloudflare_api_token)&select=key,value");
+          if (seeCfg) seeCfg.forEach(function(r){ if(r.key==="cloudflare_account_id") seeAcc=seeAcc||r.value; if(r.key==="cloudflare_api_token") seeTok=seeTok||r.value; });
+        }
+        if (!seeAcc || !seeTok) return J({ error: "missing cloudflare credentials" }, 500);
+        var brResp = await fetch("https://api.cloudflare.com/client/v4/accounts/" + seeAcc + "/browser-rendering/screenshot", {
           method: "POST",
-          headers: { "Authorization": "Bearer " + env.CLOUDFLARE_API_TOKEN, "Content-Type": "application/json" },
+          headers: { "Authorization": "Bearer " + seeTok, "Content-Type": "application/json" },
           body: JSON.stringify({ url: "https://fen-worker.fenfrost.workers.dev/", viewport: { width: vpW, height: vpH }, screenshotOptions: { fullPage: fullPage }, gotoOptions: { waitUntil: "networkidle2", timeout: 8000 } })
         });
         if (!brResp.ok) {
