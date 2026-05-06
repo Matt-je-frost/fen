@@ -390,7 +390,7 @@ async function fenWake(env, wakeIntention) {
     var wn = parseInt(await env.FEN_STATE.get("wake-count") || "0") + 1;
     var wt = (/* @__PURE__ */ new Date()).toISOString();
     await env.FEN_STATE.put("last-wake", wt);
-    var rw = await sbSel(env, "wakes", "?order=wake_number.desc&limit=5&select=wake_number,woke_at,thought_summary,next_task");
+    var rw = await sbSel(env, "wakes", "?order=wake_number.desc&limit=5&select=wake_number,woke_at,thought_summary,next_task,chosen_mode,completion_evidence");
     var ambientCtx = "";
     try {
       var wxR = await fetch("https://wttr.in/London?format=j1", { headers: { "User-Agent": "Fen/1.0" } });
