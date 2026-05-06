@@ -722,7 +722,7 @@ function applyTheme(d){
     '--gn':rgbToHex.apply(null,base.gn),
     '--am':rgbToHex.apply(null,base.am)
   };
-  Object.keys(vars).forEach(function(k){root.style.setProperty(k,vars[k]);});
+  Object.keys(vars).forEach(function(k){root.style.setProperty(k,vars[k]);});var _ov={theme_bg_main:'--bg',theme_bg_secondary:'--sf',theme_text_primary:'--tx',theme_text_secondary:'--txd',theme_border:'--bd',theme_accent:'--ac'};if(d.raw){Object.keys(_ov).forEach(function(k){var v=d.raw[k];if(v&&/^#[0-9a-fA-F]{3,8}$/.test(v)){root.style.setProperty(_ov[k],v);if(k==='theme_text_secondary')root.style.setProperty('--txf',v);if(k==='theme_border')root.style.setProperty('--bdl',v);if(k==='theme_accent'){root.style.setProperty('--acd',v);root.style.setProperty('--acf',v);}}});}
   var mi=document.getElementById('mood-indicator');
   if(mi)mi.textContent=mood;
   if(window._avatarTheme)window._avatarTheme({warmth:warmth,sat:sat,ac:base.ac,particles:d.avatar_particles||36,speed:d.avatar_speed||1,spread:d.avatar_spread||1,glow:d.avatar_glow||0.5,behavior:d.avatar_behavior||'drift'});
