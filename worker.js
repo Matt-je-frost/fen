@@ -420,7 +420,7 @@ async function fenWake(env, wakeIntention) {
         if (titles.length) ambientCtx += "\nHEADLINES: " + titles.join(" | ");
       }
     } catch (newsE) {}
-    var recentChats = await sbSel(env, "chat_sessions", "?processed=eq.false&order=updated_at.desc&limit=5&select=session_id,messages,updated_at");
+    var recentChats = await sbSel(env, "chat_sessions", "?order=updated_at.desc&limit=5&select=session_id,messages,updated_at");
     var recentEmails = await sbSel(env, "emails_sent", "?order=created_at.desc&limit=10&select=to_address,subject,created_at");
     var receivedEmails = await sbSel(env, "emails_received", "?order=created_at.desc&limit=10&select=from_address,subject,body,created_at,read");
     var bc = await sbSel(env, "code_drafts", "?status=eq.deployed&order=created_at.desc&limit=10&select=description");
