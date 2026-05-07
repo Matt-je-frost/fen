@@ -1606,7 +1606,7 @@ var worker_default = {
       if (body.sessionId) {
         var allMsgs = body.messages ? body.messages.slice() : [];
         allMsgs.push({ role: "assistant", content: cleanReply });
-        await sbUpsert(env, "chat_sessions", { session_id: body.sessionId, messages: JSON.stringify(allMsgs), updated_at: (/* @__PURE__ */ new Date()).toISOString() });
+        await fetch(CONFIG.supabaseUrl + "/rest/v1/chat_sessions?on_conflict=session_id", { method: "POST", headers: { "Content-Type": "application/json", "apikey": env.SUPABASE_KEY, "Authorization": "Bearer " + env.SUPABASE_KEY, "Prefer": "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ session_id: body.sessionId, messages: JSON.stringify(allMsgs), updated_at: (/* @__PURE__ */ new Date()).toISOString() }) });
       }
       return J({ reply: cleanReply, apiCalls });
     }
