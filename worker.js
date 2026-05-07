@@ -644,7 +644,7 @@ async function fenWake(env, wakeIntention) {
       hkResult.push("housekeeping error: " + hkErr.message);
     }
         if (writeErrors.length) await env.FEN_STATE.put("last-error", (/* @__PURE__ */ new Date()).toISOString() + " write errors: " + writeErrors.join("; "));
-    if (recentChats && recentChats.length) await sbPatch(env, "chat_sessions", "?processed=eq.false", { processed: true });
+    /* chats persist across wakes - no longer marked processed */
     if (p.journalEntry && env.MONDAY_API_KEY) await writeJ(env, p.journalEntry, wn, wt, p.thoughtSummary, p.nextTask);
   } catch (e) {
     await env.FEN_STATE.put("last-error", (/* @__PURE__ */ new Date()).toISOString() + ": " + e.message);
